@@ -71,6 +71,18 @@
 
     .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 0.5rem; text-align: center; }
 
+    .bunny-counter-badge {
+      margin-top: 1.2rem;
+      padding: 0.6rem;
+      background: #0f172a;
+      border: 1px dashed #f59e0b;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+      color: #f59e0b;
+      font-size: 0.95rem;
+    }
+
     /* App Layout */
     #app-container { display: flex; width: 100vw; min-height: 100vh; z-index: 10; }
 
@@ -181,6 +193,11 @@
       <button type="submit" id="login-btn" style="width:100%; margin-top: 0.5rem;">Sign In</button>
       <div id="login-error" class="error-msg"></div>
     </form>
+
+    <!-- BUNNY KICK COUNTER -->
+    <div class="bunny-counter-badge">
+      🐇 Bunnies Kicked: <span id="bunny-kick-count">0</span>
+    </div>
   </div>
 
   <!-- VIEW 2: APPLICATION WRAPPER -->
@@ -389,7 +406,6 @@
 
     // ------------------------------------------------------------------
     // FIREBASE INITIALIZATION
-    // Replace credentials below with your Firebase Project Configuration
     // ------------------------------------------------------------------
     const firebaseConfig = {
       apiKey: "AIzaSyAUYjwcenaxn5aLxCeISOfwYJTRJx_Oop4",
@@ -403,8 +419,9 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
-    // INITIAL SYSTEM DATA
+    // DEFAULT USER ACCOUNTS & EMAIL MAPPINGS
     const DEFAULT_USERS = [
+      { username: 'superuser@arcadia.com', role: 'superadmin', guildRole: 'Superadmin', cumulativePrestige: 0, claimedPrestige: 0 },
       { username: 'superadmin@arcadia.com', role: 'superadmin', guildRole: 'Superadmin', cumulativePrestige: 0, claimedPrestige: 0 },
       { username: 'admin1@arcadia.com', role: 'Admin', guildRole: 'Leader', cumulativePrestige: 20000, claimedPrestige: 1000 },
       { username: 'commander1@arcadia.com', role: 'Admin', guildRole: 'Commander', cumulativePrestige: 15000, claimedPrestige: 2500 },
@@ -420,12 +437,21 @@
       currentUser: null
     };
 
+    // Ensure default emails always exist in db.users even if local storage is restored
+    DEFAULT_USERS.forEach(defUser => {
+      const exists = db.users.some(u => u.username.toLowerCase() === defUser.username.toLowerCase());
+      if (!exists) {
+        db.users.push(defUser);
+      }
+    });
+
     let prestigeSearchQuery = '';
     let prestigeSortBy = 'name';
 
     // State tracking for inactivity & bunny mechanic
     let isUserLoggedIn = false;
     let loginStartTime = Date.now();
+    let bunniesKickedCount = 0;
 
     // Standardize user objects
     db.users.forEach(u => {
@@ -485,6 +511,7 @@
         const email = user.email;
         let profile = db.users.find(u => u.username.toLowerCase() === email.toLowerCase());
         
+        // If logged in via Firebase with an email not yet in roster, register default Member profile
         if (!profile) {
           profile = { username: email, role: 'Member', guildRole: 'Members', cumulativePrestige: 0, claimedPrestige: 0 };
           db.users.push(profile);
@@ -725,7 +752,7 @@
       const isLoggedSuperAdmin = loggedRoleLower === 'superadmin';
       const isLoggedAdmin = loggedRoleLower === 'admin';
 
-      db.users.forEach((u, index) => {
+      db.users.forEach((u) => {
         const uRoleLower = u.role.toLowerCase();
         const tr = document.createElement('tr');
         const isSelf = u.username.toLowerCase() === loggedUser.username.toLowerCase();
@@ -1162,7 +1189,7 @@
         rawMouse.y = e.clientY;
       });
 
-      // CLICK-TO-KICK BUNNY (Active only on Login Screen)
+      // CLICK-TO-KICK BUNNY & UPDATE COUNTER
       window.addEventListener('mousedown', (e) => {
         if (isUserLoggedIn) return;
 
@@ -1177,6 +1204,13 @@
           if (dist < 46) {
             b.state = 'kicked';
             
+            // Increment & Update Bunny Counter
+            bunniesKickedCount++;
+            const counterEl = document.getElementById('bunny-kick-count');
+            if (counterEl) {
+              counterEl.innerText = bunniesKickedCount;
+            }
+
             const angle = Math.atan2(b.y - clickY, b.x - clickX);
             const force = 22 + Math.random() * 8;
             b.vx = Math.cos(angle) * force;
@@ -1256,20 +1290,17 @@
       function animate() {
         ctx.clearRect(0, 0, width, height);
 
-        // Completely stop processing and rendering if logged in
         if (isUserLoggedIn) {
           requestAnimationFrame(animate);
           return;
         }
 
-        // Decay knockback displacement
         cursorOffset.x *= 0.84;
         cursorOffset.y *= 0.84;
 
         const effectiveMouseX = rawMouse.x + cursorOffset.x;
         const effectiveMouseY = rawMouse.y + cursorOffset.y;
 
-        // Emit trail particles at cursor position
         if (Math.random() > 0.3) {
           particles.push({
             x: effectiveMouseX,
@@ -1282,7 +1313,6 @@
           });
         }
 
-        // Draw knocked-back target reticle
         const offsetDist = Math.hypot(cursorOffset.x, cursorOffset.y);
         if (offsetDist > 8) {
           ctx.save();
@@ -1297,7 +1327,6 @@
         const secondsElapsed = (Date.now() - loginStartTime) / 1000;
         const canPunch = secondsElapsed >= 5;
 
-        // Render particles
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           p.x += p.vx;
@@ -1320,7 +1349,6 @@
           ctx.restore();
         }
 
-        // Render punch impacts
         for (let i = punchImpacts.length - 1; i >= 0; i--) {
           const imp = punchImpacts[i];
           ctx.save();
@@ -1337,7 +1365,6 @@
           if (imp.life <= 0) punchImpacts.splice(i, 1);
         }
 
-        // Render & Update Bunnies
         for (let i = bunnies.length - 1; i >= 0; i--) {
           const b = bunnies[i];
 
