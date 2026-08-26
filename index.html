@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arcadia Guild Portal</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+    
+    .hidden { display: none !important; }
+    button { cursor: pointer; border: none; background: var(--accent); color: white; padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 600; transition: 0.2s; }
+    button:hover { background: var(--accent-hover); }
+    button.secondary { background: #475569; }
+    button.secondary:hover { background: #334155; }
+    button.danger { background: var(--danger); }
+    input, select, textarea { background: #0f172a; border: 1px solid #334155; color: white; padding: 0.6rem; border-radius: 6px; width: 100%; margin-top: 0.3rem; margin-bottom: 1rem; }
+    
+    /* Login Screen */
+    .auth-container { max-width: 420px; margin: auto; padding: 2.5rem; background: var(--card-bg); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+
+    /* Top Nav Bar */
+    header { background: var(--card-bg); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; }
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .badge { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 12px; font-weight: bold; text-transform: uppercase; }
+    .badge-superadmin { background: #8b5cf6; }
+    .badge-admin { background: #3b82f6; }
+    .badge-officer { background: #10b981; }
+    .badge-member { background: #64748b; }
+
+    /* Main Content Layout */
+    main { flex: 1; padding: 2rem; max-width: 1200px; margin: 0 auto; width: 100%; }
+    .card { background: var(--card-bg); padding: 1.5rem; border-radius: 10px; margin-bottom: 1.5rem; }
+
+    /* Spreadsheet Table */
+    .table-responsive { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; text-align: left; }
+    th, td { border: 1px solid #334155; padding: 0.75rem; }
+    th { background: #0f172a; color: var(--accent); white-space: nowrap; }
+    td[contenteditable="true"]:focus { background: #334155; outline: 2px solid var(--accent); }
+  </style>
+</head>
+<body>
+
+  <!-- VIEW 1: CLEAN LOGIN -->
+  <div id="view-login" class="auth-container">
+    <h2 style="margin-bottom: 1.5rem; text-align: center;">Arcadia Guild Portal</h2>
+    <form id="login-form">
+      <label>Username</label>
+      <input type="text" id="login-username" required autocomplete="username">
+      <label>Password</label>
+      <input type="password" id="login-password" required autocomplete="current-password">
+      <button type="submit" style="width:100%; margin-top: 0.5rem;">Sign In</button>
+    </form>
+  </div>
+
+  <!-- APPLICATION HEADER -->
+  <header id="app-header" class="hidden">
+    <div class="header-left">
+      <button id="nav-btn" class="secondary">🏆 Prestige</button>
+      <h3 id="app-title">Guild Arcadia</h3>
+    </div>
+    <div>
+      <span id="user-display"></span>
+      <span id="role-badge" class="badge"></span>
+      <button id="logout-btn" class="danger" style="margin-left: 1rem; padding: 0.4rem 0.8rem;">Logout</button>
+    </div>
+  </header>
+
+  <!-- VIEW 2: WELCOME PAGE -->
+  <main id="view-welcome" class="hidden">
+    <div class="card">
+      <h1 style="color: var(--accent); margin-bottom: 0.5rem;">Welcome to Guild Arcadia</h1>
+      <p id="welcome-message" style="font-size: 1.1rem; line-height: 1.6; white-space: pre-wrap;"></p>
+      
+      <!-- Admin / Super Admin Controls for Welcome Message -->
+      <div id="welcome-edit-section" class="hidden" style="margin-top: 1.5rem; border-top: 1px solid #334155; padding-top: 1rem;">
+        <h4>Edit Welcome Message (Admin Access)</h4>
+        <textarea id="welcome-input" rows="3"></textarea>
+        <button id="save-welcome-btn">Save Message</button>
+      </div>
+    </div>
+
+    <!-- SUPER ADMIN SELF CREDENTIAL MANAGEMENT -->
+    <div id="superadmin-credentials-section" class="card hidden" style="border: 1px solid var(--accent);">
+      <h2>Super Admin Credentials Management</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+        Only you can update your Super Admin username and password.
+      </p>
+      <form id="update-superadmin-form" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+        <div style="flex:1; min-width: 150px;">
+          <label>New Username</label>
+          <input type="text" id="sa-new-username" required style="margin:0;">
+        </div>
+        <div style="flex:1; min-width: 150px;">
+          <label>New Password</label>
+          <input type="password" id="sa-new-password" required style="margin:0;">
+        </div>
+        <button type="submit">Update Account</button>
+      </form>
+    </div>
+
+    <!-- USER DATABASE MANAGEMENT -->
+    <div id="user-management-section" class="card hidden">
+      <h2>User Database & Management</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+        Super Admins can manage all roles. Admins can manage Members, Officers, and Admins (except Super Admin). Officers and Members have no management access.
+      </p>
+
+      <!-- Add User Form -->
+      <form id="create-user-form" style="display: flex; gap: 1rem; align-items: flex-end; margin-bottom: 1rem; flex-wrap: wrap;">
+        <div style="flex:1; min-width: 150px;">
+          <label>New Username</label>
+          <input type="text" id="new-user-name" required style="margin:0;">
+        </div>
+        <div style="flex:1; min-width: 150px;">
+          <label>Password</label>
+          <input type="password" id="new-user-pass" required style="margin:0;">
+        </div>
+        <div style="flex:1; min-width: 150px;">
+          <label>Role</label>
+          <select id="new-user-role" style="margin:0;">
+            <option value="member">Member</option>
+            <option value="officer">Officer</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <button type="submit">Add User</button>
+      </form>
+
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Role</th>
+              <th>Change Role / Action</th>
+            </tr>
+          </thead>
+          <tbody id="user-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 3: PRESTIGE PAGE -->
+  <main id="view-sheets" class="hidden">
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+        <h2>Arcadia Prestige Records</h2>
+        <div id="sheet-controls" class="hidden" style="display: flex; gap: 0.5rem;">
+          <button id="add-row-btn">+ Add Row</button>
+          <button id="add-col-btn" class="secondary">+ Add Column</button>
+        </div>
+      </div>
+      <p id="sheet-access-notice" style="color: var(--text-muted); margin-bottom: 1rem;"></p>
+
+      <div class="table-responsive">
+        <table id="prestige-table">
+          <thead id="prestige-thead"></thead>
+          <tbody id="prestige-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // DEFAULT SYSTEM STATE (Master Account: Superadmin / Super123)
+    const DEFAULT_USERS = [
+      { username: 'Superadmin', password: 'Super123', role: 'superadmin' },
+      { username: 'admin1', password: 'admin123', role: 'admin' },
+      { username: 'officer1', password: 'officer123', role: 'officer' },
+      { username: 'member1', password: 'user123', role: 'member' }
+    ];
+
+    const DEFAULT_COLUMNS = ["Character Name", "Guild Rank", "Contribution Points"];
+
+    const DEFAULT_SHEET_DATA = [
+      { "Character Name": "Aelindor", "Guild Rank": "Guild Master", "Contribution Points": "15,400" },
+      { "Character Name": "Lyra", "Guild Rank": "Officer", "Contribution Points": "12,100" },
+      { "Character Name": "Kaelen", "Guild Rank": "Member", "Contribution Points": "4,500" }
+    ];
+
+    // Initialize Database from Local Storage or Defaults
+    let db = {
+      users: JSON.parse(localStorage.getItem('arcadia_users')) || DEFAULT_USERS,
+      welcomeMsg: localStorage.getItem('arcadia_welcome') || "Greetings, adventurer! Welcome to the hall of Arcadia. Stand strong together and prepare for the next raid season.",
+      columns: JSON.parse(localStorage.getItem('arcadia_columns')) || DEFAULT_COLUMNS,
+      sheets: JSON.parse(localStorage.getItem('arcadia_sheets')) || DEFAULT_SHEET_DATA,
+      currentUser: null
+    };
+
+    function saveDB() {
+      localStorage.setItem('arcadia_users', JSON.stringify(db.users));
+      localStorage.setItem('arcadia_welcome', db.welcomeMsg);
+      localStorage.setItem('arcadia_columns', JSON.stringify(db.columns));
+      localStorage.setItem('arcadia_sheets', JSON.stringify(db.sheets));
+    }
+
+    // AUTHENTICATION
+    document.getElementById('login-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const userVal = document.getElementById('login-username').value.trim();
+      const passVal = document.getElementById('login-password').value;
+
+      const user = db.users.find(u => u.username.toLowerCase() === userVal.toLowerCase() && u.password === passVal);
+      if (user) {
+        db.currentUser = user;
+        document.getElementById('login-form').reset();
+        showApp();
+      } else {
+        alert('Invalid username or password!');
+      }
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      db.currentUser = null;
+      document.getElementById('app-header').classList.add('hidden');
+      document.getElementById('view-welcome').classList.add('hidden');
+      document.getElementById('view-sheets').classList.add('hidden');
+      document.getElementById('view-login').classList.remove('hidden');
+    });
+
+    // NAVIGATION
+    let currentTab = 'welcome';
+    const navBtn = document.getElementById('nav-btn');
+    
+    navBtn.addEventListener('click', () => {
+      if (currentTab === 'welcome') {
+        currentTab = 'sheets';
+        navBtn.innerText = '🏠 Back to Welcome Page';
+        document.getElementById('view-welcome').classList.add('hidden');
+        document.getElementById('view-sheets').classList.remove('hidden');
+        renderSheets();
+      } else {
+        currentTab = 'welcome';
+        navBtn.innerText = '🏆 Prestige';
+        document.getElementById('view-sheets').classList.add('hidden');
+        document.getElementById('view-welcome').classList.remove('hidden');
+        renderWelcome();
+      }
+    });
+
+    // VIEW RENDERERS
+    function showApp() {
+      document.getElementById('view-login').classList.add('hidden');
+      document.getElementById('app-header').classList.remove('hidden');
+      
+      const role = db.currentUser.role;
+      document.getElementById('user-display').innerText = db.currentUser.username;
+      
+      const badge = document.getElementById('role-badge');
+      badge.innerText = role;
+      badge.className = `badge badge-${role}`;
+
+      currentTab = 'welcome';
+      navBtn.innerText = '🏆 Prestige';
+      document.getElementById('view-sheets').classList.add('hidden');
+      document.getElementById('view-welcome').classList.remove('hidden');
+      
+      renderWelcome();
+    }
+
+    function renderWelcome() {
+      document.getElementById('welcome-message').innerText = db.welcomeMsg;
+      const isSuperAdmin = db.currentUser.role === 'superadmin';
+      const isPowerUser = db.currentUser.role === 'admin' || isSuperAdmin;
+      
+      // Welcome Edit Access
+      const editSection = document.getElementById('welcome-edit-section');
+      if (isPowerUser) {
+        editSection.classList.remove('hidden');
+        document.getElementById('welcome-input').value = db.welcomeMsg;
+      } else {
+        editSection.classList.add('hidden');
+      }
+
+      // Super Admin Only Credentials Section
+      const saCredSection = document.getElementById('superadmin-credentials-section');
+      if (isSuperAdmin) {
+        saCredSection.classList.remove('hidden');
+        document.getElementById('sa-new-username').value = db.currentUser.username;
+        document.getElementById('sa-new-password').value = db.currentUser.password;
+      } else {
+        saCredSection.classList.add('hidden');
+      }
+
+      // User Database Section
+      const userSection = document.getElementById('user-management-section');
+      if (isPowerUser) {
+        userSection.classList.remove('hidden');
+        renderUserTable();
+      } else {
+        userSection.classList.add('hidden');
+      }
+    }
+
+    // SUPER ADMIN CREDENTIAL UPDATE LOGIC
+    document.getElementById('update-superadmin-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (db.currentUser.role !== 'superadmin') {
+        alert('Unauthorized!');
+        return;
+      }
+      const newUname = document.getElementById('sa-new-username').value.trim();
+      const newPass = document.getElementById('sa-new-password').value;
+
+      const saUser = db.users.find(u => u.role === 'superadmin');
+      if (saUser) {
+        saUser.username = newUname;
+        saUser.password = newPass;
+        db.currentUser.username = newUname;
+        db.currentUser.password = newPass;
+        saveDB();
+        document.getElementById('user-display').innerText = newUname;
+        renderUserTable();
+        alert('Super Admin username and password updated!');
+      }
+    });
+
+    // WELCOME MESSAGE UPDATE LOGIC
+    document.getElementById('save-welcome-btn').addEventListener('click', () => {
+      if (db.currentUser.role !== 'admin' && db.currentUser.role !== 'superadmin') return;
+      db.welcomeMsg = document.getElementById('welcome-input').value;
+      saveDB();
+      renderWelcome();
+      alert('Welcome message updated.');
+    });
+
+    // USER MANAGEMENT LOGIC
+    function renderUserTable() {
+      const tbody = document.getElementById('user-table-body');
+      tbody.innerHTML = '';
+      const loggedUser = db.currentUser;
+
+      db.users.forEach((u) => {
+        const tr = document.createElement('tr');
+        
+        const isTargetSuperAdmin = u.role === 'superadmin';
+        let canManipulate = false;
+
+        if (loggedUser.role === 'superadmin') {
+          canManipulate = !isTargetSuperAdmin; // Super Admin manages all non-Super Admin users
+        } else if (loggedUser.role === 'admin') {
+          canManipulate = !isTargetSuperAdmin; // Admin can manage everyone except Super Admin
+        }
+
+        let actionHtml = `<em>Protected Account</em>`;
+
+        if (canManipulate) {
+          actionHtml = `
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <select onchange="changeUserRole('${u.username}', this.value)" style="margin:0; width:auto; padding:0.3rem;">
+                <option value="member" ${u.role === 'member' ? 'selected' : ''}>Member</option>
+                <option value="officer" ${u.role === 'officer' ? 'selected' : ''}>Officer</option>
+                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+              </select>
+              <button onclick="deleteUser('${u.username}')" class="danger" style="padding:0.3rem 0.6rem;">Delete</button>
+            </div>
+          `;
+        }
+
+        tr.innerHTML = `
+          <td>${u.username}</td>
+          <td><span class="badge badge-${u.role}">${u.role}</span></td>
+          <td>${actionHtml}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('create-user-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const uname = document.getElementById('new-user-name').value.trim();
+      const pass = document.getElementById('new-user-pass').value;
+      const role = document.getElementById('new-user-role').value;
+
+      if (db.users.some(u => u.username.toLowerCase() === uname.toLowerCase())) {
+        alert('Username already exists!');
+        return;
+      }
+
+      db.users.push({ username: uname, password: pass, role: role });
+      saveDB();
+      renderUserTable();
+      document.getElementById('create-user-form').reset();
+    });
+
+    window.changeUserRole = function(username, newRole) {
+      const loggedUser = db.currentUser;
+      const target = db.users.find(u => u.username === username);
+
+      if (!target || target.role === 'superadmin') {
+        alert('Super Admin data cannot be altered from this table!');
+        renderUserTable();
+        return;
+      }
+
+      target.role = newRole;
+      saveDB();
+      renderUserTable();
+    };
+
+    window.deleteUser = function(username) {
+      const target = db.users.find(u => u.username === username);
+      if (!target || target.role === 'superadmin') {
+        alert('Super Admin account cannot be deleted!');
+        return;
+      }
+
+      db.users = db.users.filter(u => u.username !== username);
+      saveDB();
+      renderUserTable();
+    };
+
+    // PRESTIGE SPREADSHEET LOGIC
+    function renderSheets() {
+      const isPowerUser = db.currentUser.role === 'admin' || db.currentUser.role === 'superadmin';
+      const controls = document.getElementById('sheet-controls');
+      const notice = document.getElementById('sheet-access-notice');
+      const thead = document.getElementById('prestige-thead');
+      const tbody = document.getElementById('prestige-tbody');
+
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+
+      if (isPowerUser) {
+        controls.classList.remove('hidden');
+        notice.innerText = "Mode: Full Edit Access. Click any cell to edit. Press [Enter] to jump to the row below.";
+      } else {
+        controls.classList.add('hidden');
+        notice.innerText = "Mode: Read-Only Access. (Only Admins and Super Admins can edit records).";
+      }
+
+      // Headers
+      const headerTr = document.createElement('tr');
+      db.columns.forEach((colName) => {
+        const th = document.createElement('th');
+        th.innerText = colName;
+        headerTr.appendChild(th);
+      });
+      if (isPowerUser) {
+        const thAction = document.createElement('th');
+        thAction.innerText = "Actions";
+        headerTr.appendChild(thAction);
+      }
+      thead.appendChild(headerTr);
+
+      // Rows
+      db.sheets.forEach((row, rowIndex) => {
+        const tr = document.createElement('tr');
+        
+        db.columns.forEach((colName) => {
+          const td = document.createElement('td');
+          td.contentEditable = isPowerUser;
+          td.innerText = row[colName] || '';
+          
+          if (isPowerUser) {
+            td.addEventListener('blur', () => {
+              row[colName] = td.innerText.trim();
+              saveDB();
+            });
+          }
+          tr.appendChild(td);
+        });
+
+        if (isPowerUser) {
+          const tdAction = document.createElement('td');
+          tdAction.innerHTML = `<button onclick="deleteSheetRow(${rowIndex})" class="danger" style="padding:0.2rem 0.5rem;">Delete</button>`;
+          tr.appendChild(tdAction);
+        }
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ENTER KEY SPREADSHEET NAVIGATION
+    document.getElementById('prestige-table').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.tagName === 'TD' && e.target.isContentEditable) {
+        e.preventDefault();
+        
+        const currentTd = e.target;
+        const currentTr = currentTd.parentElement;
+        const colIndex = Array.from(currentTr.children).indexOf(currentTd);
+        const nextTr = currentTr.nextElementSibling;
+
+        currentTd.blur();
+
+        if (nextTr) {
+          const nextTd = nextTr.children[colIndex];
+          if (nextTd && nextTd.isContentEditable) {
+            nextTd.focus();
+            const range = document.createRange();
+            range.selectNodeContents(nextTd);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        }
+      }
+    });
+
+    document.getElementById('add-row-btn').addEventListener('click', () => {
+      if (db.currentUser.role !== 'admin' && db.currentUser.role !== 'superadmin') return;
+      const newRow = {};
+      db.columns.forEach((col, idx) => {
+        newRow[col] = idx === 0 ? "New Member" : "-";
+      });
+      db.sheets.push(newRow);
+      saveDB();
+      renderSheets();
+    });
+
+    document.getElementById('add-col-btn').addEventListener('click', () => {
+      if (db.currentUser.role !== 'admin' && db.currentUser.role !== 'superadmin') return;
+      const colName = prompt("Enter the name for the new column:");
+      if (!colName || colName.trim() === '') return;
+
+      const trimmedName = colName.trim();
+      if (db.columns.includes(trimmedName)) {
+        alert('Column name already exists!');
+        return;
+      }
+
+      db.columns.push(trimmedName);
+      db.sheets.forEach(row => { row[trimmedName] = "-"; });
+
+      saveDB();
+      renderSheets();
+    });
+
+    window.deleteSheetRow = function(index) {
+      if (db.currentUser.role !== 'admin' && db.currentUser.role !== 'superadmin') return;
+      db.sheets.splice(index, 1);
+      saveDB();
+      renderSheets();
+    };
+  </script>
+</body>
+</html>
