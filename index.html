@@ -48,6 +48,9 @@
     table { width: 100%; border-collapse: collapse; margin-top: 1rem; text-align: left; }
     th, td { border: 1px solid #334155; padding: 0.75rem; }
     th { background: #0f172a; color: var(--accent); white-space: nowrap; }
+    th .th-content { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    th .delete-col-btn { background: transparent; color: var(--danger); font-size: 0.8rem; padding: 0.1rem 0.3rem; border-radius: 4px; }
+    th .delete-col-btn:hover { background: rgba(239, 68, 68, 0.2); }
     td[contenteditable="true"]:focus { background: #334155; outline: 2px solid var(--accent); }
   </style>
 </head>
@@ -84,7 +87,7 @@
       <h1 style="color: var(--accent); margin-bottom: 0.5rem;">Welcome to Guild Arcadia</h1>
       <p id="welcome-message" style="font-size: 1.1rem; line-height: 1.6; white-space: pre-wrap;"></p>
       
-      <!-- Admin / Super Admin Controls for Welcome Message -->
+      <!-- Admin Controls for Welcome Message -->
       <div id="welcome-edit-section" class="hidden" style="margin-top: 1.5rem; border-top: 1px solid #334155; padding-top: 1rem;">
         <h4>Edit Welcome Message (Admin Access)</h4>
         <textarea id="welcome-input" rows="3"></textarea>
@@ -92,7 +95,7 @@
       </div>
     </div>
 
-    <!-- SUPER ADMIN SELF CREDENTIAL MANAGEMENT -->
+    <!-- SUPER ADMIN CREDENTIALS MANAGEMENT -->
     <div id="superadmin-credentials-section" class="card hidden" style="border: 1px solid var(--accent);">
       <h2>Super Admin Credentials Management</h2>
       <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
@@ -115,10 +118,9 @@
     <div id="user-management-section" class="card hidden">
       <h2>User Database & Management</h2>
       <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
-        Super Admins can manage all roles. Admins can manage Members, Officers, and Admins (except Super Admin). Officers and Members have no management access.
+        Super Admins can manage all roles. Admins can manage Members, Officers, and Admins (except Super Admin).
       </p>
 
-      <!-- Add User Form -->
       <form id="create-user-form" style="display: flex; gap: 1rem; align-items: flex-end; margin-bottom: 1rem; flex-wrap: wrap;">
         <div style="flex:1; min-width: 150px;">
           <label>New Username</label>
@@ -159,9 +161,12 @@
     <div class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
         <h2>Arcadia Prestige Records</h2>
-        <div id="sheet-controls" class="hidden" style="display: flex; gap: 0.5rem;">
+        <div id="sheet-controls" class="hidden" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
           <button id="add-row-btn">+ Add Row</button>
           <button id="add-col-btn" class="secondary">+ Add Column</button>
+          <button id="export-json-btn" class="secondary">📥 Export JSON</button>
+          <button id="import-json-btn" class="secondary">📤 Import JSON</button>
+          <input type="file" id="json-file-input" accept=".json" class="hidden">
         </div>
       </div>
       <p id="sheet-access-notice" style="color: var(--text-muted); margin-bottom: 1rem;"></p>
@@ -176,7 +181,7 @@
   </main>
 
   <script>
-    // DEFAULT SYSTEM STATE (Master Account: Superadmin / Super123)
+    // DEFAULT SYSTEM STATE
     const DEFAULT_USERS = [
       { username: 'Superadmin', password: 'Super123', role: 'superadmin' },
       { username: 'admin1', password: 'admin123', role: 'admin' },
@@ -185,21 +190,39 @@
     ];
 
     const DEFAULT_COLUMNS = ["Character Name", "Guild Rank", "Contribution Points"];
-
     const DEFAULT_SHEET_DATA = [
       { "Character Name": "Aelindor", "Guild Rank": "Guild Master", "Contribution Points": "15,400" },
       { "Character Name": "Lyra", "Guild Rank": "Officer", "Contribution Points": "12,100" },
       { "Character Name": "Kaelen", "Guild Rank": "Member", "Contribution Points": "4,500" }
     ];
 
-    // Initialize Database from Local Storage or Defaults
     let db = {
       users: JSON.parse(localStorage.getItem('arcadia_users')) || DEFAULT_USERS,
-      welcomeMsg: localStorage.getItem('arcadia_welcome') || "Greetings, adventurer! Welcome to the hall of Arcadia. Stand strong together and prepare for the next raid season.",
+      welcomeMsg: localStorage.getItem('arcadia_welcome') || "Greetings, adventurer! Welcome to the hall of Arcadia.",
       columns: JSON.parse(localStorage.getItem('arcadia_columns')) || DEFAULT_COLUMNS,
       sheets: JSON.parse(localStorage.getItem('arcadia_sheets')) || DEFAULT_SHEET_DATA,
       currentUser: null
     };
+
+    // Load initial prestige data from repository file if local storage is empty
+    async function loadRepoJsonFallback() {
+      if (!localStorage.getItem('arcadia_columns')) {
+        try {
+          const res = await fetch('./prestige_data.json');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.columns && data.sheets) {
+              db.columns = data.columns;
+              db.sheets = data.sheets;
+              saveDB();
+            }
+          }
+        } catch (e) {
+          // Fallback file not present or unreachable; default array stays
+        }
+      }
+    }
+    loadRepoJsonFallback();
 
     function saveDB() {
       localStorage.setItem('arcadia_users', JSON.stringify(db.users));
@@ -252,7 +275,6 @@
       }
     });
 
-    // VIEW RENDERERS
     function showApp() {
       document.getElementById('view-login').classList.add('hidden');
       document.getElementById('app-header').classList.remove('hidden');
@@ -277,7 +299,6 @@
       const isSuperAdmin = db.currentUser.role === 'superadmin';
       const isPowerUser = db.currentUser.role === 'admin' || isSuperAdmin;
       
-      // Welcome Edit Access
       const editSection = document.getElementById('welcome-edit-section');
       if (isPowerUser) {
         editSection.classList.remove('hidden');
@@ -286,7 +307,6 @@
         editSection.classList.add('hidden');
       }
 
-      // Super Admin Only Credentials Section
       const saCredSection = document.getElementById('superadmin-credentials-section');
       if (isSuperAdmin) {
         saCredSection.classList.remove('hidden');
@@ -296,7 +316,6 @@
         saCredSection.classList.add('hidden');
       }
 
-      // User Database Section
       const userSection = document.getElementById('user-management-section');
       if (isPowerUser) {
         userSection.classList.remove('hidden');
@@ -306,13 +325,9 @@
       }
     }
 
-    // SUPER ADMIN CREDENTIAL UPDATE LOGIC
     document.getElementById('update-superadmin-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      if (db.currentUser.role !== 'superadmin') {
-        alert('Unauthorized!');
-        return;
-      }
+      if (db.currentUser.role !== 'superadmin') return;
       const newUname = document.getElementById('sa-new-username').value.trim();
       const newPass = document.getElementById('sa-new-password').value;
 
@@ -325,11 +340,10 @@
         saveDB();
         document.getElementById('user-display').innerText = newUname;
         renderUserTable();
-        alert('Super Admin username and password updated!');
+        alert('Super Admin credentials updated!');
       }
     });
 
-    // WELCOME MESSAGE UPDATE LOGIC
     document.getElementById('save-welcome-btn').addEventListener('click', () => {
       if (db.currentUser.role !== 'admin' && db.currentUser.role !== 'superadmin') return;
       db.welcomeMsg = document.getElementById('welcome-input').value;
@@ -338,7 +352,6 @@
       alert('Welcome message updated.');
     });
 
-    // USER MANAGEMENT LOGIC
     function renderUserTable() {
       const tbody = document.getElementById('user-table-body');
       tbody.innerHTML = '';
@@ -346,15 +359,8 @@
 
       db.users.forEach((u) => {
         const tr = document.createElement('tr');
-        
         const isTargetSuperAdmin = u.role === 'superadmin';
-        let canManipulate = false;
-
-        if (loggedUser.role === 'superadmin') {
-          canManipulate = !isTargetSuperAdmin; // Super Admin manages all non-Super Admin users
-        } else if (loggedUser.role === 'admin') {
-          canManipulate = !isTargetSuperAdmin; // Admin can manage everyone except Super Admin
-        }
+        let canManipulate = (loggedUser.role === 'superadmin' || loggedUser.role === 'admin') && !isTargetSuperAdmin;
 
         let actionHtml = `<em>Protected Account</em>`;
 
@@ -398,15 +404,8 @@
     });
 
     window.changeUserRole = function(username, newRole) {
-      const loggedUser = db.currentUser;
       const target = db.users.find(u => u.username === username);
-
-      if (!target || target.role === 'superadmin') {
-        alert('Super Admin data cannot be altered from this table!');
-        renderUserTable();
-        return;
-      }
-
+      if (!target || target.role === 'superadmin') return;
       target.role = newRole;
       saveDB();
       renderUserTable();
@@ -414,11 +413,7 @@
 
     window.deleteUser = function(username) {
       const target = db.users.find(u => u.username === username);
-      if (!target || target.role === 'superadmin') {
-        alert('Super Admin account cannot be deleted!');
-        return;
-      }
-
+      if (!target || target.role === 'superadmin') return;
       db.users = db.users.filter(u => u.username !== username);
       saveDB();
       renderUserTable();
@@ -437,19 +432,29 @@
 
       if (isPowerUser) {
         controls.classList.remove('hidden');
-        notice.innerText = "Mode: Full Edit Access. Click any cell to edit. Press [Enter] to jump to the row below.";
+        notice.innerText = "Mode: Full Edit Access. Click cells to edit. Press [Enter] to move down.";
       } else {
         controls.classList.add('hidden');
-        notice.innerText = "Mode: Read-Only Access. (Only Admins and Super Admins can edit records).";
+        notice.innerText = "Mode: Read-Only Access.";
       }
 
-      // Headers
+      // Headers with Delete Column button
       const headerTr = document.createElement('tr');
       db.columns.forEach((colName) => {
         const th = document.createElement('th');
-        th.innerText = colName;
+        if (isPowerUser) {
+          th.innerHTML = `
+            <div class="th-content">
+              <span>${colName}</span>
+              <button class="delete-col-btn" title="Remove Column" onclick="deleteColumn('${colName}')">✕</button>
+            </div>
+          `;
+        } else {
+          th.innerText = colName;
+        }
         headerTr.appendChild(th);
       });
+
       if (isPowerUser) {
         const thAction = document.createElement('th');
         thAction.innerText = "Actions";
@@ -457,7 +462,7 @@
       }
       thead.appendChild(headerTr);
 
-      // Rows
+      // Table Body Rows
       db.sheets.forEach((row, rowIndex) => {
         const tr = document.createElement('tr');
         
@@ -485,11 +490,25 @@
       });
     }
 
+    // REMOVE COLUMN LOGIC
+    window.deleteColumn = function(colName) {
+      if (db.currentUser.role !== 'admin' && db.currentUser.role !== 'superadmin') return;
+      if (db.columns.length <= 1) {
+        alert("You must keep at least one column!");
+        return;
+      }
+      if (!confirm(`Are you sure you want to delete column "${colName}"?`)) return;
+
+      db.columns = db.columns.filter(c => c !== colName);
+      db.sheets.forEach(row => delete row[colName]);
+      saveDB();
+      renderSheets();
+    };
+
     // ENTER KEY SPREADSHEET NAVIGATION
     document.getElementById('prestige-table').addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && e.target.tagName === 'TD' && e.target.isContentEditable) {
         e.preventDefault();
-        
         const currentTd = e.target;
         const currentTr = currentTd.parentElement;
         const colIndex = Array.from(currentTr.children).indexOf(currentTd);
@@ -538,6 +557,52 @@
 
       saveDB();
       renderSheets();
+    });
+
+    // EXPORT JSON DATA
+    document.getElementById('export-json-btn').addEventListener('click', () => {
+      const exportData = {
+        columns: db.columns,
+        sheets: db.sheets
+      };
+      const jsonStr = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'prestige_data.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // IMPORT JSON DATA
+    document.getElementById('import-json-btn').addEventListener('click', () => {
+      document.getElementById('json-file-input').click();
+    });
+
+    document.getElementById('json-file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const parsed = JSON.parse(evt.target.result);
+          if (Array.isArray(parsed.columns) && Array.isArray(parsed.sheets)) {
+            db.columns = parsed.columns;
+            db.sheets = parsed.sheets;
+            saveDB();
+            renderSheets();
+            alert("Prestige JSON data imported successfully!");
+          } else {
+            alert("Invalid JSON format. File must contain 'columns' and 'sheets' arrays.");
+          }
+        } catch (err) {
+          alert("Error parsing JSON file!");
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
     });
 
     window.deleteSheetRow = function(index) {
