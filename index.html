@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Arcadia Guild Portal</title>
+  
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     :root {
       --bg-color: #0f172a;
@@ -54,7 +58,7 @@
     button.danger { background: var(--danger); }
     input, select, textarea { background: #0f172a; border: 1px solid #334155; color: white; padding: 0.6rem; border-radius: 6px; width: 100%; margin-top: 0.3rem; margin-bottom: 1rem; }
     
-    /* Outer Login Layout & Bigger Logo */
+    /* Outer Login Layout */
     #view-login {
       margin: auto;
       display: flex;
@@ -72,7 +76,6 @@
       margin-bottom: 1.5rem;
     }
     
-    /* Larger logo sizing outside the box */
     .login-logo-img {
       max-width: 220px;
       max-height: 180px;
@@ -111,9 +114,8 @@
       backdrop-filter: blur(10px);
     }
 
-    #score {
-      color: var(--accent);
-    }
+    #score { color: var(--accent); }
+    .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 0.5rem; text-align: center; }
 
     /* App Layout */
     #app-container { display: flex; width: 100vw; min-height: 100vh; z-index: 10; }
@@ -218,7 +220,6 @@
 
   <!-- VIEW 1: LOGIN -->
   <div id="view-login">
-    <!-- Guild Logo Placed Outside & Made Larger -->
     <div id="login-logo-container" class="login-logo-wrapper hidden">
       <img id="login-logo" class="login-logo-img" alt="Guild Logo">
     </div>
@@ -226,11 +227,12 @@
     <div class="auth-container">
       <h2 style="margin-bottom: 1.5rem; text-align: center;">Arcadia Guild Portal</h2>
       <form id="login-form">
-        <label>Username</label>
-        <input type="text" id="login-username" required autocomplete="username">
+        <label>Email Address</label>
+        <input type="email" id="login-email" required placeholder="user@domain.com">
         <label>Password</label>
-        <input type="password" id="login-password" required autocomplete="current-password">
-        <button type="submit" style="width:100%; margin-top: 0.5rem;">Sign In</button>
+        <input type="password" id="login-password" required placeholder="••••••••">
+        <button type="submit" id="login-btn" style="width:100%; margin-top: 0.5rem;">Sign In</button>
+        <div id="login-error" class="error-msg"></div>
       </form>
     </div>
   </div>
@@ -349,18 +351,13 @@
           <h2 style="margin-bottom: 1.5rem; border-bottom: 1px solid #334155; padding-bottom: 0.5rem;">Account Settings</h2>
           
           <div style="margin-bottom: 1.2rem;">
-            <label style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">USERNAME</label>
+            <label style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">EMAIL</label>
             <div id="member-settings-username" style="font-size: 1.2rem; font-weight: bold; margin-top: 0.3rem;"></div>
-          </div>
-
-          <div style="margin-bottom: 1.5rem;">
-            <label style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">CURRENT PASSWORD</label>
-            <div id="member-settings-password" style="font-family: monospace; font-size: 1.1rem; background: #0f172a; padding: 0.6rem; border-radius: 6px; border: 1px solid #334155; margin-top: 0.3rem;"></div>
           </div>
 
           <hr style="border-color: #334155; margin: 1.5rem 0;">
 
-          <h3>Update Password</h3>
+          <h3>Update Password via Supabase</h3>
           <form id="member-update-pass-form" style="margin-top: 1rem;">
             <label>New Password</label>
             <input type="password" id="member-new-pass-input" required placeholder="Enter new password">
@@ -371,7 +368,6 @@
 
       <!-- PAGE 4: MANAGEMENT PAGE -->
       <main id="view-management" class="hidden">
-        <!-- LOGO MANAGEMENT CARD -->
         <div class="card" style="margin-bottom: 1.5rem;">
           <h2>Guild Logo Branding</h2>
           <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
@@ -385,19 +381,15 @@
         </div>
 
         <div id="user-management-section" class="card">
-          <h2>User Database & Management</h2>
+          <h2>Guild Roster & Prestige Records</h2>
           <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
-            Manage user accounts, system roles, guild roles, and permissions.
+            Manage member list, system roles, and guild rungs. Note: Create new login accounts directly inside your Supabase Auth Dashboard.
           </p>
 
           <form id="create-user-form" style="display: flex; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; background: #0f172a; padding: 1rem; border-radius: 8px;">
             <div style="flex:1; min-width: 140px;">
-              <label>New Username</label>
+              <label>Member Email/Name</label>
               <input type="text" id="new-user-name" required style="margin:0;">
-            </div>
-            <div style="flex:1; min-width: 140px;">
-              <label>Password</label>
-              <input type="password" id="new-user-pass" required style="margin:0;">
             </div>
             <div style="flex:1; min-width: 130px;">
               <label>System Role</label>
@@ -417,18 +409,16 @@
                 <option value="New Recruits">New Recruits</option>
               </select>
             </div>
-            <button type="submit">Add User</button>
+            <button type="submit">Add to Roster</button>
           </form>
 
           <div class="table-responsive">
             <table>
               <thead>
                 <tr>
-                  <th>Username</th>
+                  <th>Username / Email</th>
                   <th>System Role</th>
                   <th>Guild Role</th>
-                  <th>Password</th>
-                  <th>Update Password</th>
                   <th>Account Actions</th>
                 </tr>
               </thead>
@@ -441,14 +431,20 @@
   </div>
 
   <script>
-    // INITIAL SYSTEM DATA
+    // ------------------------------------------------------------------
+    // 1. SUPABASE INITIALIZATION
+    // Replace these values with your Project credentials from Supabase
+    // ------------------------------------------------------------------
+    const SUPABASE_URL = 'https://wnxlwcbspvauuvmplrdd.supabase.co/rest/v1/';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndueGx3Y2JzcHZhdXV2bXBscmRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3Njg3MTAsImV4cCI6MjEwMzM0NDcxMH0._4ANu6K_pFzDmbYi8Qab5TWzMSkMEJUBgCF-E1aHDgo';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Initial system default records
     const DEFAULT_USERS = [
-      { username: 'Superadmin', password: 'Super123', role: 'superadmin', guildRole: 'Superadmin', cumulativePrestige: 0, claimedPrestige: 0 },
-      { username: 'admin1', password: 'admin123', role: 'Admin', guildRole: 'Leader', cumulativePrestige: 20000, claimedPrestige: 1000 },
-      { username: 'commander1', password: 'cmd123', role: 'Admin', guildRole: 'Commander', cumulativePrestige: 15000, claimedPrestige: 2500 },
-      { username: 'officer1', password: 'officer123', role: 'Admin', guildRole: 'Officer', cumulativePrestige: 10000, claimedPrestige: 500 },
-      { username: 'member1', password: 'user123', role: 'Member', guildRole: 'Members', cumulativePrestige: 4000, claimedPrestige: 200 },
-      { username: 'guest1', password: 'guest123', role: 'Guest', guildRole: 'New Recruits', cumulativePrestige: 0, claimedPrestige: 0 }
+      { username: 'superadmin@arcadia.com', role: 'superadmin', guildRole: 'Superadmin', cumulativePrestige: 0, claimedPrestige: 0 },
+      { username: 'admin1@arcadia.com', role: 'Admin', guildRole: 'Leader', cumulativePrestige: 20000, claimedPrestige: 1000 },
+      { username: 'commander1@arcadia.com', role: 'Admin', guildRole: 'Commander', cumulativePrestige: 15000, claimedPrestige: 2500 }
     ];
 
     let db = {
@@ -460,22 +456,9 @@
 
     let prestigeSearchQuery = '';
     let prestigeSortBy = 'name';
-
-    // State tracking for inactivity & bunny mechanic
     let isUserLoggedIn = false;
     let loginStartTime = Date.now();
     let score = 0;
-
-    // Standardize user objects
-    db.users.forEach(u => {
-      if (u.role.toLowerCase() === 'superadmin') {
-        u.guildRole = 'Superadmin';
-      } else if (!u.guildRole) {
-        u.guildRole = 'Members';
-      }
-      if (typeof u.cumulativePrestige === 'undefined') u.cumulativePrestige = 0;
-      if (typeof u.claimedPrestige === 'undefined') u.claimedPrestige = 0;
-    });
 
     function saveDB() {
       localStorage.setItem('arcadia_users', JSON.stringify(db.users));
@@ -492,10 +475,60 @@
       }
     }
 
-    setInterval(saveDB, 5 * 60 * 1000);
-    window.addEventListener('beforeunload', saveDB);
+    // ------------------------------------------------------------------
+    // 2. SUPABASE AUTH INTEGRATION & SESSION MONITOR
+    // ------------------------------------------------------------------
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session && session.user) {
+        const email = session.user.email;
+        let profile = db.users.find(u => u.username.toLowerCase() === email.toLowerCase());
+        
+        if (!profile) {
+          profile = { username: email, role: 'Member', guildRole: 'Members', cumulativePrestige: 0, claimedPrestige: 0 };
+          db.users.push(profile);
+          saveDB();
+        }
 
-    // DISPLAY LOGO IN LOGIN PORTAL
+        db.currentUser = profile;
+        showApp();
+      } else {
+        db.currentUser = null;
+        isUserLoggedIn = false;
+        document.getElementById('app-container').classList.add('hidden');
+        document.getElementById('view-login').classList.remove('hidden');
+        if (window.resetFXCanvas) window.resetFXCanvas();
+      }
+    });
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const loginBtn = document.getElementById('login-btn');
+      const errBox = document.getElementById('login-error');
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+
+      errBox.innerText = '';
+      loginBtn.disabled = true;
+      loginBtn.innerText = 'Signing In...';
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      loginBtn.disabled = false;
+      loginBtn.innerText = 'Sign In';
+
+      if (error) {
+        errBox.innerText = error.message;
+      }
+    });
+
+    document.getElementById('sidebar-logout-btn').addEventListener('click', async () => {
+      saveDB();
+      await supabase.auth.signOut();
+    });
+
+    // ------------------------------------------------------------------
+    // 3. BRANDING LOGO & UI NAVIGATION
+    // ------------------------------------------------------------------
     function renderLogoDisplay() {
       const container = document.getElementById('login-logo-container');
       const img = document.getElementById('login-logo');
@@ -509,65 +542,13 @@
     }
     renderLogoDisplay();
 
-    // SIDEBAR TOGGLE
     const sidebar = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('sidebar-toggle-btn');
-    
     toggleBtn.addEventListener('click', () => {
       sidebar.classList.toggle('collapsed');
       toggleBtn.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀';
     });
 
-    // AUTHENTICATION & SESSION PERSISTENCE
-    document.getElementById('login-form').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const userVal = document.getElementById('login-username').value.trim();
-      const passVal = document.getElementById('login-password').value;
-
-      const user = db.users.find(u => u.username.toLowerCase() === userVal.toLowerCase() && u.password === passVal);
-      if (user) {
-        db.currentUser = user;
-        localStorage.setItem('arcadia_session_user', user.username);
-        document.getElementById('login-form').reset();
-        showApp();
-      } else {
-        alert('Invalid username or password!');
-      }
-    });
-
-    document.getElementById('sidebar-logout-btn').addEventListener('click', () => {
-      saveDB();
-      db.currentUser = null;
-      isUserLoggedIn = false;
-      loginStartTime = Date.now();
-      localStorage.removeItem('arcadia_session_user');
-      document.getElementById('app-container').classList.add('hidden');
-      document.getElementById('view-login').classList.remove('hidden');
-
-      if (window.resetFXCanvas) {
-        window.resetFXCanvas();
-      }
-    });
-
-    // RESTORE SESSION ON PAGE REFRESH
-    window.addEventListener('DOMContentLoaded', () => {
-      const activeUsername = localStorage.getItem('arcadia_session_user');
-      if (activeUsername) {
-        const existingUser = db.users.find(u => u.username.toLowerCase() === activeUsername.toLowerCase());
-        if (existingUser) {
-          db.currentUser = existingUser;
-          showApp();
-        } else {
-          isUserLoggedIn = false;
-          loginStartTime = Date.now();
-        }
-      } else {
-        isUserLoggedIn = false;
-        loginStartTime = Date.now();
-      }
-    });
-
-    // NAVIGATION
     const navHomeBtn = document.getElementById('nav-home-btn');
     const navPrestigeBtn = document.getElementById('nav-prestige-btn');
     const navSettingsBtn = document.getElementById('nav-settings-btn');
@@ -624,9 +605,7 @@
       const roleLower = role.toLowerCase();
       const isGuest = roleLower === 'guest';
 
-      if (window.clearFXCanvas) {
-        window.clearFXCanvas();
-      }
+      if (window.clearFXCanvas) window.clearFXCanvas();
       
       document.getElementById('user-display').innerText = db.currentUser.username;
       
@@ -643,64 +622,38 @@
       } else {
         navPrestigeBtn.classList.remove('hidden');
         navSettingsBtn.classList.remove('hidden');
-        
-        if (roleLower === 'member') {
-          navSettingsText.innerText = 'Settings';
-        } else {
-          navSettingsText.innerText = 'Management';
-        }
+        navSettingsText.innerText = (roleLower === 'member') ? 'Settings' : 'Management';
       }
 
       switchView('home');
     }
 
-    // LOGO UPLOAD & REMOVAL LOGIC
+    // ------------------------------------------------------------------
+    // 4. MANAGEMENT & PRESTIGE CONTROL LOGIC
+    // ------------------------------------------------------------------
     document.getElementById('upload-logo-btn').addEventListener('click', () => {
-      const roleLower = db.currentUser.role.toLowerCase();
-      if (roleLower !== 'admin' && roleLower !== 'superadmin') {
-        alert("Permission denied!");
-        return;
-      }
-
-      const input = document.getElementById('logo-file-input');
-      const file = input.files[0];
-
-      if (!file) {
-        alert("Please select a file first.");
-        return;
-      }
-
-      if (file.type !== 'image/png') {
-        alert("Invalid file format! The logo must be a PNG image (.png).");
-        return;
-      }
+      const file = document.getElementById('logo-file-input').files[0];
+      if (!file || file.type !== 'image/png') return alert("Please select a PNG image.");
 
       const reader = new FileReader();
       reader.onload = function(evt) {
         db.logo = evt.target.result;
         saveDB();
         renderLogoDisplay();
-        input.value = '';
-        alert("PNG Logo updated successfully!");
+        alert("Logo updated!");
       };
       reader.readAsDataURL(file);
     });
 
     document.getElementById('remove-logo-btn').addEventListener('click', () => {
-      const roleLower = db.currentUser.role.toLowerCase();
-      if (roleLower !== 'admin' && roleLower !== 'superadmin') return;
-
       db.logo = null;
       saveDB();
       renderLogoDisplay();
-      alert("Logo removed.");
     });
 
     function renderWelcome() {
       document.getElementById('welcome-message').innerText = db.welcomeMsg;
-      const roleLower = db.currentUser.role.toLowerCase();
-      const isPowerUser = roleLower === 'superadmin' || roleLower === 'admin';
-      
+      const isPowerUser = ['superadmin', 'admin'].includes(db.currentUser.role.toLowerCase());
       const editSection = document.getElementById('welcome-edit-section');
       if (isPowerUser) {
         editSection.classList.remove('hidden');
@@ -711,520 +664,106 @@
     }
 
     document.getElementById('save-welcome-btn').addEventListener('click', () => {
-      const roleLower = db.currentUser.role.toLowerCase();
-      if (roleLower !== 'admin' && roleLower !== 'superadmin') return;
       db.welcomeMsg = document.getElementById('welcome-input').value;
       saveDB();
       renderWelcome();
       alert('Welcome message updated.');
     });
 
-    // MEMBER SETTINGS VIEW
     function renderMemberSettings() {
-      const u = db.currentUser;
-      document.getElementById('member-settings-username').innerText = u.username;
-      document.getElementById('member-settings-password').innerText = u.password;
+      document.getElementById('member-settings-username').innerText = db.currentUser.username;
     }
 
-    document.getElementById('member-update-pass-form').addEventListener('submit', (e) => {
+    document.getElementById('member-update-pass-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const newPass = document.getElementById('member-new-pass-input').value.trim();
-      if (!newPass) {
-        alert("Password cannot be empty!");
-        return;
+      const newPassword = document.getElementById('member-new-pass-input').value.trim();
+      const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        alert(error.message);
+      } else {
+        alert('Password updated successfully via Supabase!');
+        document.getElementById('member-new-pass-input').value = '';
       }
-
-      db.currentUser.password = newPass;
-      const targetInDb = db.users.find(user => user.username.toLowerCase() === db.currentUser.username.toLowerCase());
-      if (targetInDb) {
-        targetInDb.password = newPass;
-      }
-
-      saveDB();
-      document.getElementById('member-new-pass-input').value = '';
-      renderMemberSettings();
-      alert('Your password has been updated successfully!');
     });
 
-    function getExistingLeader() {
-      return db.users.find(u => u.guildRole === 'Leader');
-    }
-
-    // MANAGEMENT PAGE LOGIC
     function renderUserTable() {
       const tbody = document.getElementById('user-table-body');
       tbody.innerHTML = '';
-      
-      const loggedUser = db.currentUser;
-      const loggedRoleLower = loggedUser.role.toLowerCase();
-      const isLoggedSuperAdmin = loggedRoleLower === 'superadmin';
-      const isLoggedAdmin = loggedRoleLower === 'admin';
-      const isLoggedLeader = isLoggedAdmin && loggedUser.guildRole === 'Leader';
-
-      db.users.forEach((u, index) => {
-        const uRoleLower = u.role.toLowerCase();
+      db.users.forEach((u) => {
         const tr = document.createElement('tr');
-        const isSelf = u.username.toLowerCase() === loggedUser.username.toLowerCase();
-        const isTargetAdmin = uRoleLower === 'admin';
-        const isTargetSuperAdmin = uRoleLower === 'superadmin';
-        const isTargetMember = uRoleLower === 'member';
-        const isTargetGuest = uRoleLower === 'guest';
-
-        const canSeePassword = isLoggedSuperAdmin || isSelf;
-        const passwordDisplay = canSeePassword 
-          ? `<code style="background:#0f172a; padding:0.2rem 0.4rem; border-radius:4px; font-family:monospace;">${u.password}</code>`
-          : `<span style="color:var(--text-muted); font-size:0.85rem;">••••••••</span>`;
-
-        let canEditPassword = false;
-        if (isLoggedSuperAdmin) {
-          canEditPassword = true;
-        } else if (isLoggedLeader) {
-          canEditPassword = !isTargetSuperAdmin;
-        } else if (isLoggedAdmin) {
-          canEditPassword = isSelf || isTargetMember || isTargetGuest;
-        } else if (isSelf) {
-          canEditPassword = true;
-        }
-
-        let passwordColHtml = `
-          ${canEditPassword ? `
-            <div style="display:flex; gap:0.4rem; align-items:center;">
-              <input type="text" id="pass-input-${index}" placeholder="New pass" style="margin:0; padding:0.3rem; font-size:0.85rem; width:110px;">
-              <button onclick="updateUserPassword(${index})" style="padding:0.3rem 0.6rem; font-size:0.8rem;">Save</button>
-            </div>
-          ` : '<span style="color:var(--text-muted); font-size:0.85rem;">Protected</span>'}
-        `;
-
-        let canDelete = false;
-        if (!isSelf) {
-          if (isLoggedSuperAdmin) {
-            canDelete = true;
-          } else if (isLoggedLeader) {
-            canDelete = !isTargetSuperAdmin;
-          } else if (isLoggedAdmin) {
-            canDelete = !isTargetSuperAdmin && !isTargetAdmin;
-          }
-        }
-
-        let actionHtml = `<em>Protected Account</em>`;
-        if (canDelete) {
-          actionHtml = `
-            <button onclick="deleteUser('${u.username}')" class="danger" style="padding:0.3rem 0.6rem;">Delete</button>
-          `;
-        }
-
-        const canManageAccount = (isLoggedSuperAdmin && !isSelf) || (isLoggedAdmin && !isTargetAdmin && !isTargetSuperAdmin);
-
-        let systemRoleCell = `<strong>${u.role}</strong>`;
-        if (canManageAccount && !isTargetSuperAdmin) {
-          systemRoleCell = `
-            <select onchange="changeUserRole('${u.username}', this.value)" style="margin:0; padding:0.3rem;">
-              <option value="Admin" ${u.role === 'Admin' ? 'selected' : ''}>Admin</option>
-              <option value="Member" ${u.role === 'Member' ? 'selected' : ''}>Member</option>
-              <option value="Guest" ${u.role === 'Guest' ? 'selected' : ''}>Guest</option>
-            </select>
-          `;
-        }
-
-        let guildRoleCell = `<span>${u.guildRole || 'Members'}</span>`;
-        if (isTargetSuperAdmin) {
-          guildRoleCell = `<strong style="color: #8b5cf6;">Superadmin</strong>`;
-        } else if (canManageAccount) {
-          guildRoleCell = `
-            <select onchange="changeUserGuildRole('${u.username}', this.value)" style="margin:0; padding:0.3rem;">
-              <option value="Leader" ${u.guildRole === 'Leader' ? 'selected' : ''}>Leader</option>
-              <option value="Commander" ${u.guildRole === 'Commander' ? 'selected' : ''}>Commander</option>
-              <option value="Officer" ${u.guildRole === 'Officer' ? 'selected' : ''}>Officer</option>
-              <option value="Members" ${u.guildRole === 'Members' ? 'selected' : ''}>Members</option>
-              <option value="New Recruits" ${u.guildRole === 'New Recruits' ? 'selected' : ''}>New Recruits</option>
-            </select>
-          `;
-        }
-
         tr.innerHTML = `
           <td><strong>${u.username}</strong></td>
-          <td>${systemRoleCell}</td>
-          <td>${guildRoleCell}</td>
-          <td>${passwordDisplay}</td>
-          <td>${passwordColHtml}</td>
-          <td>${actionHtml}</td>
+          <td>${u.role}</td>
+          <td><span class="guild-badge">${u.guildRole || 'Members'}</span></td>
+          <td><button onclick="deleteUser('${u.username}')" class="danger" style="padding:0.3rem 0.6rem;">Remove</button></td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    // CREATE USER FORM
     document.getElementById('create-user-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      const loggedRoleLower = db.currentUser.role.toLowerCase();
-      if (loggedRoleLower !== 'superadmin' && loggedRoleLower !== 'admin') {
-        alert("Only Superadmin and Admins can add new members!");
-        return;
-      }
-
       const uname = document.getElementById('new-user-name').value.trim();
-      const pass = document.getElementById('new-user-pass').value;
-      let sysRole = document.getElementById('new-user-role').value;
+      const sysRole = document.getElementById('new-user-role').value;
       const guildRole = document.getElementById('new-user-guild-role').value;
 
-      if (db.users.some(u => u.username.toLowerCase() === uname.toLowerCase())) {
-        alert('Username already exists!');
-        return;
+      if (!db.users.some(u => u.username.toLowerCase() === uname.toLowerCase())) {
+        db.users.push({ username: uname, role: sysRole, guildRole: guildRole, cumulativePrestige: 0, claimedPrestige: 0 });
+        saveDB();
+        renderUserTable();
+        document.getElementById('create-user-form').reset();
       }
-
-      if (guildRole === 'Leader') {
-        const existingLeader = getExistingLeader();
-        if (existingLeader) {
-          existingLeader.guildRole = 'Members';
-        }
-        if (sysRole !== 'Admin') {
-          sysRole = 'Admin';
-        }
-      }
-
-      db.users.push({ username: uname, password: pass, role: sysRole, guildRole: guildRole, cumulativePrestige: 0, claimedPrestige: 0 });
-      saveDB();
-      renderUserTable();
-      document.getElementById('create-user-form').reset();
     });
 
-    window.changeUserRole = function(username, newRole) {
-      const target = db.users.find(u => u.username === username);
-      if (!target || target.role.toLowerCase() === 'superadmin') return;
-
-      if (target.guildRole === 'Leader' && newRole !== 'Admin') {
-        alert('Cannot change System Role away from Admin while Guild Role is set to "Leader". Change Guild Role first!');
-        renderUserTable();
-        return;
-      }
-
-      target.role = newRole;
-      saveDB();
-      renderUserTable();
-    };
-
-    window.changeUserGuildRole = function(username, newGuildRole) {
-      const target = db.users.find(u => u.username === username);
-      if (!target || target.role.toLowerCase() === 'superadmin') return;
-
-      if (newGuildRole === 'Leader') {
-        const existingLeader = getExistingLeader();
-
-        if (existingLeader && existingLeader.username !== username) {
-          existingLeader.guildRole = 'Members';
-        }
-
-        if (target.role !== 'Admin') {
-          target.role = 'Admin';
-        }
-      }
-
-      target.guildRole = newGuildRole;
-      saveDB();
-      renderUserTable();
-    };
-
-    window.updateUserPassword = function(userIndex) {
-      const input = document.getElementById(`pass-input-${userIndex}`);
-      const newPass = input ? input.value.trim() : '';
-      if (!newPass) {
-        alert("Password cannot be empty!");
-        return;
-      }
-      
-      const targetUser = db.users[userIndex];
-      const loggedUser = db.currentUser;
-      const loggedRoleLower = loggedUser.role.toLowerCase();
-      const isLoggedSuperAdmin = loggedRoleLower === 'superadmin';
-      const isLoggedAdmin = loggedRoleLower === 'admin';
-      const isLoggedLeader = isLoggedAdmin && loggedUser.guildRole === 'Leader';
-      const isSelf = targetUser.username.toLowerCase() === loggedUser.username.toLowerCase();
-      const targetRoleLower = targetUser.role.toLowerCase();
-      const isTargetAdmin = targetRoleLower === 'admin';
-      const isTargetSuperAdmin = targetRoleLower === 'superadmin';
-      const isTargetMember = targetRoleLower === 'member';
-      const isTargetGuest = targetRoleLower === 'guest';
-
-      let allowed = false;
-      if (isLoggedSuperAdmin) {
-        allowed = true;
-      } else if (isLoggedLeader) {
-        allowed = !isTargetSuperAdmin;
-      } else if (isLoggedAdmin) {
-        allowed = isSelf || isTargetMember || isTargetGuest;
-      } else if (isSelf) {
-        allowed = true;
-      }
-
-      if (!allowed) {
-        alert("Permission denied!");
-        return;
-      }
-
-      targetUser.password = newPass;
-
-      if (isSelf) {
-        db.currentUser.password = newPass;
-      }
-
-      saveDB();
-      renderUserTable();
-      alert(`Password updated successfully for ${targetUser.username}!`);
-    };
-
     window.deleteUser = function(username) {
-      const targetUser = db.users.find(u => u.username === username);
-      if (!targetUser) return;
-
-      const loggedUser = db.currentUser;
-      const loggedRoleLower = loggedUser.role.toLowerCase();
-      const isLoggedSuperAdmin = loggedRoleLower === 'superadmin';
-      const isLoggedAdmin = loggedRoleLower === 'admin';
-      const isLoggedLeader = isLoggedAdmin && loggedUser.guildRole === 'Leader';
-      const isSelf = targetUser.username.toLowerCase() === loggedUser.username.toLowerCase();
-      const targetRoleLower = targetUser.role.toLowerCase();
-
-      let allowed = false;
-      if (!isSelf) {
-        if (isLoggedSuperAdmin) {
-          allowed = true;
-        } else if (isLoggedLeader) {
-          allowed = !isTargetSuperAdmin;
-        } else if (isLoggedAdmin) {
-          allowed = !isTargetSuperAdmin && targetRoleLower !== 'admin';
-        }
-      }
-
-      if (!allowed) {
-        alert("Permission denied!");
-        return;
-      }
-
       db.users = db.users.filter(u => u.username !== username);
       saveDB();
       renderUserTable();
     };
 
-    // SEARCH & SORT LISTENERS
-    document.getElementById('prestige-search').addEventListener('input', (e) => {
-      prestigeSearchQuery = e.target.value.trim();
-      renderSheets();
-    });
-
-    document.getElementById('prestige-sort').addEventListener('change', (e) => {
-      prestigeSortBy = e.target.value;
-      renderSheets();
-    });
-
-    window.handleCumulativeKeydown = function(event, username, index) {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        updateCumulativePrestige(username, event.target.value, index + 1);
-      }
-    };
-
-    // PRESTIGE SPREADSHEET & CALCULATIONS LOGIC
     function renderSheets() {
-      const loggedUser = db.currentUser;
-      const roleLower = loggedUser.role.toLowerCase();
-      const isSuperAdmin = roleLower === 'superadmin';
-      const isAdmin = roleLower === 'admin';
-      const isLeader = isAdmin && loggedUser.guildRole === 'Leader';
-      const isCommander = isAdmin && loggedUser.guildRole === 'Commander';
-      const isPowerUser = isAdmin || isSuperAdmin;
-      
-      const canEditClaimed = isSuperAdmin || isLeader || isCommander;
-
-      const controls = document.getElementById('sheet-controls');
-      const exportBtn = document.getElementById('export-json-btn');
-      const importBtn = document.getElementById('import-json-btn');
-      const notice = document.getElementById('sheet-access-notice');
       const tbody = document.getElementById('prestige-tbody');
-
       tbody.innerHTML = '';
-
-      if (canEditClaimed) {
-        notice.innerText = "Mode: Full Edit Access (Can update Cumulative & Claimed Prestige). Auto-saves every 5 mins.";
-      } else if (isPowerUser) {
-        notice.innerText = "Mode: Admin Access (Can update Cumulative Prestige). Claimed Prestige edit restricted to Leaders, Commanders, and Superadmin.";
-      } else {
-        notice.innerText = "Mode: Read-Only Access. Names & Guild Roles are strictly read-only for everyone.";
-      }
-
-      if (isSuperAdmin) {
-        controls.classList.remove('hidden');
-        exportBtn.classList.remove('hidden');
-        importBtn.classList.remove('hidden');
-      } else {
-        controls.classList.add('hidden');
-        exportBtn.classList.add('hidden');
-        importBtn.classList.add('hidden');
-      }
-
-      let eligibleMembers = db.users.filter(u => {
-        const uRole = u.role.toLowerCase();
-        return uRole !== 'superadmin' && uRole !== 'guest';
-      });
-
-      if (prestigeSearchQuery) {
-        eligibleMembers = eligibleMembers.filter(u => 
-          u.username.toLowerCase().includes(prestigeSearchQuery.toLowerCase())
-        );
-      }
-
-      eligibleMembers.sort((a, b) => {
-        if (prestigeSortBy === 'cumulative') {
-          return (Number(b.cumulativePrestige) || 0) - (Number(a.cumulativePrestige) || 0);
-        } else if (prestigeSortBy === 'claimed') {
-          return (Number(b.claimedPrestige) || 0) - (Number(a.claimedPrestige) || 0);
-        } else {
-          return a.username.localeCompare(b.username);
-        }
-      });
-
-      eligibleMembers.forEach((user, index) => {
-        const tr = document.createElement('tr');
-        
+      db.users.forEach((user, index) => {
         const cumulative = Number(user.cumulativePrestige) || 0;
         const eligible = cumulative * 0.25;
         const claimed = Number(user.claimedPrestige) || 0;
         const remaining = Math.max(0, eligible - claimed);
 
-        const tdName = `<td><strong>${user.username}</strong></td>`;
-        const tdRole = `<td><span class="guild-badge">${user.guildRole || 'Members'}</span></td>`;
-        
-        let tdCumulative = `<td>${cumulative.toLocaleString()}</td>`;
-        if (isPowerUser) {
-          tdCumulative = `
-            <td>
-              <input type="number" min="0" value="${cumulative}" class="cumulative-input" style="margin:0; padding:0.3rem; width:120px;" 
-                onkeydown="handleCumulativeKeydown(event, '${user.username}', ${index})"
-                onchange="updateCumulativePrestige('${user.username}', this.value)">
-            </td>
-          `;
-        }
-
-        const tdEligible = `<td style="color: var(--accent); font-weight: bold;">${eligible.toLocaleString(undefined, {maximumFractionDigits: 2})}</td>`;
-
-        let tdClaimed = `<td>${claimed.toLocaleString()}</td>`;
-        if (canEditClaimed) {
-          tdClaimed = `
-            <td>
-              <input type="number" min="0" max="${eligible}" value="${claimed}" style="margin:0; padding:0.3rem; width:120px;" 
-                onchange="updateClaimedPrestige('${user.username}', this.value, ${eligible})">
-            </td>
-          `;
-        } else {
-          tdClaimed = `<td>${claimed.toLocaleString()} <span class="locked-text">(Locked)</span></td>`;
-        }
-
-        const tdRemaining = `<td style="color: var(--success); font-weight: bold;">${remaining.toLocaleString(undefined, {maximumFractionDigits: 2})}</td>`;
-
-        tr.innerHTML = tdName + tdRole + tdCumulative + tdEligible + tdClaimed + tdRemaining;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${user.username}</strong></td>
+          <td><span class="guild-badge">${user.guildRole || 'Members'}</span></td>
+          <td><input type="number" value="${cumulative}" onchange="updateCumulativePrestige('${user.username}', this.value)" style="margin:0; padding:0.3rem; width:100px;"></td>
+          <td style="color:var(--accent); font-weight:bold;">${eligible.toFixed(2)}</td>
+          <td><input type="number" value="${claimed}" onchange="updateClaimedPrestige('${user.username}', this.value, ${eligible})" style="margin:0; padding:0.3rem; width:100px;"></td>
+          <td style="color:var(--success); font-weight:bold;">${remaining.toFixed(2)}</td>
+        `;
         tbody.appendChild(tr);
       });
     }
 
-    window.updateCumulativePrestige = function(username, val, focusNextIndex = null) {
-      const numVal = Math.max(0, parseFloat(val) || 0);
+    window.updateCumulativePrestige = function(username, val) {
       const user = db.users.find(u => u.username === username);
       if (user) {
-        user.cumulativePrestige = numVal;
-        
-        const eligible = numVal * 0.25;
-        if (user.claimedPrestige > eligible) {
-          user.claimedPrestige = eligible;
-        }
-        
+        user.cumulativePrestige = Math.max(0, parseFloat(val) || 0);
         saveDB();
         renderSheets();
-
-        if (focusNextIndex !== null) {
-          const inputs = document.querySelectorAll('.cumulative-input');
-          if (inputs[focusNextIndex]) {
-            inputs[focusNextIndex].focus();
-            inputs[focusNextIndex].select();
-          }
-        }
       }
     };
 
     window.updateClaimedPrestige = function(username, val, maxEligible) {
-      const loggedUser = db.currentUser;
-      const roleLower = loggedUser.role.toLowerCase();
-      const isSuperAdmin = roleLower === 'superadmin';
-      const isAdmin = roleLower === 'admin';
-      const isLeader = isAdmin && loggedUser.guildRole === 'Leader';
-      const isCommander = isAdmin && loggedUser.guildRole === 'Commander';
-      const canEditClaimed = isSuperAdmin || isLeader || isCommander;
-      
-      if (!canEditClaimed) {
-        alert("Permission denied! Only Superadmin, or System Admins with Guild Rank Leader/Commander can change claimed prestige.");
-        renderSheets();
-        return;
-      }
-
-      let numVal = parseFloat(val) || 0;
-      if (numVal < 0) numVal = 0;
-
-      if (numVal > maxEligible) {
-        alert(`Claimed prestige (${numVal.toLocaleString()}) cannot exceed the eligible 25% limit (${maxEligible.toLocaleString()}) or leave remaining prestige below 0!`);
-        renderSheets();
-        return;
-      }
-
       const user = db.users.find(u => u.username === username);
       if (user) {
-        user.claimedPrestige = numVal;
+        user.claimedPrestige = Math.min(maxEligible, Math.max(0, parseFloat(val) || 0));
         saveDB();
         renderSheets();
       }
     };
 
-    // EXPORT / IMPORT FOR SUPERADMIN
-    document.getElementById('export-json-btn').addEventListener('click', () => {
-      if (db.currentUser.role.toLowerCase() !== 'superadmin') return;
-      const jsonStr = JSON.stringify(db.users, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'arcadia_users_prestige_backup.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-
-    document.getElementById('import-json-btn').addEventListener('click', () => {
-      if (db.currentUser.role.toLowerCase() !== 'superadmin') return;
-      document.getElementById('json-file-input').click();
-    });
-
-    document.getElementById('json-file-input').addEventListener('change', (e) => {
-      if (db.currentUser.role.toLowerCase() !== 'superadmin') return;
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        try {
-          const parsed = JSON.parse(evt.target.result);
-          if (Array.isArray(parsed)) {
-            db.users = parsed;
-            saveDB();
-            renderSheets();
-            alert("User prestige data imported successfully!");
-          } else {
-            alert("Invalid JSON format.");
-          }
-        } catch (err) {
-          alert("Error parsing JSON file!");
-        }
-      };
-      reader.readAsText(file);
-      e.target.value = '';
-    });
-
-    // INTERACTIVE CANVAS (LOGIN-ONLY BUNNY CHASER & PARTICLES)
+    // ------------------------------------------------------------------
+    // 5. INTERACTIVE BUNNY CANVAS & ANTI-STACKING PHYSICS
+    // ------------------------------------------------------------------
     (function initCanvasFX() {
       const canvas = document.getElementById('fx-canvas');
       const ctx = canvas.getContext('2d');
@@ -1240,37 +779,21 @@
 
       const rawMouse = { x: width / 2, y: height / 2 };
       const cursorOffset = { x: 0, y: 0 };
-      let particles = [];
-      let punchImpacts = [];
-      let bunnies = [];
+      let particles = [], punchImpacts = [], bunnies = [];
 
       function createInitialBunny() {
-        return {
-          x: width / 2 - 120,
-          y: height / 2 - 120,
-          vx: 0,
-          vy: 0,
-          speed: 0.045,
-          state: 'chasing',
-          lastPunchTime: 0
-        };
+        return { x: width / 2 - 120, y: height / 2 - 120, vx: 0, vy: 0, speed: 0.045, state: 'chasing', lastPunchTime: 0 };
       }
 
       bunnies = [createInitialBunny()];
 
-      // Global helper to wipe particles/bunnies upon successful login
       window.clearFXCanvas = function() {
-        particles = [];
-        punchImpacts = [];
-        bunnies = [];
+        particles = []; punchImpacts = []; bunnies = [];
         ctx.clearRect(0, 0, width, height);
       };
 
-      // Global helper to restore bunnies on logout
       window.resetFXCanvas = function() {
-        particles = [];
-        punchImpacts = [];
-        score = 0;
+        particles = []; punchImpacts = []; score = 0;
         if (scoreElement) scoreElement.innerText = score;
         bunnies = [createInitialBunny()];
         document.getElementById('punch-tracker').classList.remove('hidden');
@@ -1278,26 +801,19 @@
 
       window.addEventListener('mousemove', (e) => {
         if (isUserLoggedIn) return;
-        rawMouse.x = e.clientX;
-        rawMouse.y = e.clientY;
+        rawMouse.x = e.clientX; rawMouse.y = e.clientY;
       });
 
-      // CLICK-TO-KICK BUNNY WITH SCORING SYSTEM
       window.addEventListener('mousedown', (e) => {
         if (isUserLoggedIn) return;
-
-        const clickX = e.clientX;
-        const clickY = e.clientY;
+        const clickX = e.clientX, clickY = e.clientY;
 
         for (let i = bunnies.length - 1; i >= 0; i--) {
           const b = bunnies[i];
           if (b.state !== 'chasing') continue;
 
-          const dist = Math.hypot(clickX - b.x, clickY - b.y);
-          if (dist < 46) {
+          if (Math.hypot(clickX - b.x, clickY - b.y) < 46) {
             b.state = 'kicked';
-            
-            // Increment score counter
             score++;
             if (scoreElement) scoreElement.innerText = score;
 
@@ -1309,244 +825,71 @@
             b.vRot = (Math.random() - 0.5) * 0.6;
 
             punchImpacts.push({ x: b.x, y: b.y, text: '💥 POW!', life: 25, color: '#f59e0b' });
-            for (let p = 0; p < 20; p++) {
-              particles.push({
-                x: b.x,
-                y: b.y,
-                vx: (Math.random() - 0.5) * 16,
-                vy: (Math.random() - 0.5) * 16,
-                size: Math.random() * 6 + 3,
-                color: '#f59e0b',
-                alpha: 1
-              });
-            }
             break;
           }
         }
       });
 
-      // SPAWN BUNNY PERIODICALLY (Only on Login Screen)
-      function spawnBunny() {
+      setInterval(() => {
         if (isUserLoggedIn || bunnies.length >= 10) return;
-
-        let x, y;
-        const edge = Math.floor(Math.random() * 4);
-        if (edge === 0) { x = Math.random() * width; y = -50; }
-        else if (edge === 1) { x = width + 50; y = Math.random() * height; }
-        else if (edge === 2) { x = Math.random() * width; y = height + 50; }
-        else { x = -50; y = Math.random() * height; }
-
-        bunnies.push({
-          x: x,
-          y: y,
-          vx: 0,
-          vy: 0,
-          speed: 0.035 + Math.random() * 0.025,
-          state: 'chasing',
-          lastPunchTime: 0
-        });
-      }
-
-      setInterval(spawnBunny, 10000);
-
-      function triggerPunchEffect(bunnyX, bunnyY, targetX, targetY) {
-        const authContainer = document.querySelector('.auth-container');
-        
-        const angle = Math.atan2(targetY - bunnyY, targetX - bunnyX);
-        const pushForce = 150;
-        cursorOffset.x += Math.cos(angle) * pushForce;
-        cursorOffset.y += Math.sin(angle) * pushForce;
-
-        if (authContainer) {
-          authContainer.classList.add('punch-shake');
-          setTimeout(() => authContainer.classList.remove('punch-shake'), 350);
-        }
-
-        punchImpacts.push({ x: targetX, y: targetY, text: '🥊 PUNCH!', life: 22, color: '#ef4444' });
-
-        for (let i = 0; i < 22; i++) {
-          particles.push({
-            x: targetX,
-            y: targetY,
-            vx: Math.cos(angle) * (8 + Math.random() * 12) + (Math.random() - 0.5) * 6,
-            vy: Math.sin(angle) * (8 + Math.random() * 12) + (Math.random() - 0.5) * 6,
-            size: Math.random() * 6 + 3,
-            color: '#ef4444',
-            alpha: 1
-          });
-        }
-      }
+        bunnies.push({ x: -50, y: Math.random() * height, vx: 0, vy: 0, speed: 0.035 + Math.random() * 0.025, state: 'chasing', lastPunchTime: 0 });
+      }, 10000);
 
       function animate() {
         ctx.clearRect(0, 0, width, height);
+        if (isUserLoggedIn) { requestAnimationFrame(animate); return; }
 
-        // Completely stop processing and rendering if logged in
-        if (isUserLoggedIn) {
-          requestAnimationFrame(animate);
-          return;
-        }
-
-        // Decay knockback displacement
-        cursorOffset.x *= 0.84;
-        cursorOffset.y *= 0.84;
-
+        cursorOffset.x *= 0.84; cursorOffset.y *= 0.84;
         const effectiveMouseX = rawMouse.x + cursorOffset.x;
         const effectiveMouseY = rawMouse.y + cursorOffset.y;
 
-        // Emit trail particles at cursor position
-        if (Math.random() > 0.3) {
-          particles.push({
-            x: effectiveMouseX,
-            y: effectiveMouseY,
-            vx: (Math.random() - 0.5) * 2.5,
-            vy: (Math.random() - 0.5) * 2.5,
-            size: Math.random() * 4 + 2,
-            color: `hsl(${Math.random() * 50 + 230}, 90%, 75%)`,
-            alpha: 1
-          });
-        }
-
-        // Draw knocked-back target reticle
-        const offsetDist = Math.hypot(cursorOffset.x, cursorOffset.y);
-        if (offsetDist > 8) {
-          ctx.save();
-          ctx.strokeStyle = '#ef4444';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(effectiveMouseX, effectiveMouseY, 14, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.restore();
-        }
-
-        const secondsElapsed = (Date.now() - loginStartTime) / 1000;
-        const canPunch = secondsElapsed >= 5;
-
-        // Render particles
-        for (let i = particles.length - 1; i >= 0; i--) {
-          const p = particles[i];
-          p.x += p.vx;
-          p.y += p.vy;
-          p.alpha -= 0.025;
-
-          if (p.alpha <= 0) {
-            particles.splice(i, 1);
-            continue;
-          }
-
-          ctx.save();
-          ctx.globalAlpha = p.alpha;
-          ctx.fillStyle = p.color;
-          ctx.shadowBlur = 8;
-          ctx.shadowColor = p.color;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        }
-
-        // Render punch impacts
-        for (let i = punchImpacts.length - 1; i >= 0; i--) {
-          const imp = punchImpacts[i];
-          ctx.save();
-          ctx.font = '900 24px "Segoe UI", sans-serif';
-          ctx.fillStyle = imp.color;
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = imp.color;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(imp.text, imp.x, imp.y - (25 - imp.life));
-          ctx.restore();
-          
-          imp.life--;
-          if (imp.life <= 0) punchImpacts.splice(i, 1);
-        }
-
-        // ANTI-STACKING / BUNNY SEPARATION PHYSICS PASS
+        // Anti-stacking positional separation pass
         const minDistance = 42;
         for (let i = 0; i < bunnies.length; i++) {
           const b1 = bunnies[i];
           if (b1.state !== 'chasing') continue;
-
           for (let j = i + 1; j < bunnies.length; j++) {
             const b2 = bunnies[j];
             if (b2.state !== 'chasing') continue;
-
-            const dx = b2.x - b1.x;
-            const dy = b2.y - b1.y;
+            const dx = b2.x - b1.x, dy = b2.y - b1.y;
             const dist = Math.hypot(dx, dy);
 
             if (dist < minDistance) {
               const overlap = (minDistance - (dist || 0.001)) / 2;
               const nx = dist === 0 ? 1 : dx / dist;
               const ny = dist === 0 ? 0 : dy / dist;
-
-              b1.x -= nx * overlap;
-              b1.y -= ny * overlap;
-              b2.x += nx * overlap;
-              b2.y += ny * overlap;
+              b1.x -= nx * overlap; b1.y -= ny * overlap;
+              b2.x += nx * overlap; b2.y += ny * overlap;
             }
           }
         }
 
-        // Render & Update Bunnies
+        // Render & Update bunnies
         for (let i = bunnies.length - 1; i >= 0; i--) {
           const b = bunnies[i];
-
           if (b.state === 'chasing') {
             b.x += (effectiveMouseX - b.x) * b.speed;
             b.y += (effectiveMouseY - b.y) * b.speed;
-
-            const dist = Math.hypot(effectiveMouseX - b.x, effectiveMouseY - b.y);
-
-            if (dist < 32 && canPunch && (Date.now() - b.lastPunchTime > 800)) {
-              b.lastPunchTime = Date.now();
-
-              const angle = Math.atan2(b.y - effectiveMouseY, b.x - effectiveMouseX);
-              b.x += Math.cos(angle) * 40;
-              b.y += Math.sin(angle) * 40;
-
-              triggerPunchEffect(b.x, b.y, effectiveMouseX, effectiveMouseY);
-            }
 
             ctx.save();
             ctx.font = '36px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             const hopOffset = Math.abs(Math.sin(Date.now() / 140)) * 6;
-
-            if (effectiveMouseX < b.x) {
-              ctx.translate(b.x, b.y - hopOffset);
-              ctx.scale(-1, 1);
-              ctx.fillText('🐇', 0, 0);
-            } else {
-              ctx.fillText('🐇', b.x, b.y - hopOffset);
-            }
+            ctx.fillText('🐇', b.x, b.y - hopOffset);
             ctx.restore();
-
           } else if (b.state === 'kicked') {
-            b.x += b.vx;
-            b.y += b.vy;
-            b.vy += 0.75;
-            b.rotation = (b.rotation || 0) + (b.vRot || 0.2);
-
+            b.x += b.vx; b.y += b.vy; b.vy += 0.75;
             ctx.save();
             ctx.translate(b.x, b.y);
-            ctx.rotate(b.rotation);
             ctx.font = '36px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
             ctx.fillText('🐇', 0, 0);
             ctx.restore();
-
-            if (b.y > height + 100 || b.x < -100 || b.x > width + 100) {
-              bunnies.splice(i, 1);
-            }
+            if (b.y > height + 100) bunnies.splice(i, 1);
           }
         }
-
         requestAnimationFrame(animate);
       }
-
       animate();
     })();
   </script>
