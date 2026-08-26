@@ -1,0 +1,52 @@
+{
+  "columns": [
+    "Character Name",
+    "Guild Rank",
+    "Contribution Points",
+    "Hi"
+  ],
+  "sheets": [
+    {
+      "id": "ARC-001",
+      "name": "Aelindor",
+      "class": "Paladin",
+      "rank": "Guild Master",
+      "points": "15,400",
+      "Hi": "123",
+      "Contribution Points": ""
+    },
+    {
+      "id": "ARC-002",
+      "name": "Lyra",
+      "class": "Archmage",
+      "rank": "Officer",
+      "points": "12,100",
+      "Hi": "-",
+      "Contribution Points": ""
+    },
+    {
+      "id": "ARC-003",
+      "name": "Kaelen",
+      "class": "Shadow",
+      "rank": "Officer",
+      "points": "4,500",
+      "Hi": "-",
+      "Contribution Points": ""
+    },
+    {
+      "id": "ARC-004",
+      "name": "New Member",
+      "class": "Warrior",
+      "rank": "Recruit",
+      "points": "0",
+      "Hi": "-",
+      "Contribution Points": ""
+    },
+    {
+      "Character Name": "New Member",
+      "Guild Rank": "-",
+      "Contribution Points": "-",
+      "Hi": "-"
+    }
+  ]
+}
