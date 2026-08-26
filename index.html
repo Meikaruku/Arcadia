@@ -20,8 +20,32 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
-    body { background-color: var(--bg-color); color: var(--text); min-height: 100vh; display: flex; overflow-x: hidden; }
+    body { background-color: var(--bg-color); color: var(--text); min-height: 100vh; display: flex; overflow-x: hidden; position: relative; }
     
+    /* Interactive Canvas Overlay */
+    #fx-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Screen Punch Knockback Animation */
+    @keyframes punchShake {
+      0% { transform: translate(0, 0) rotate(0deg); }
+      20% { transform: translate(-18px, 12px) rotate(-4deg); }
+      40% { transform: translate(18px, -12px) rotate(4deg); }
+      60% { transform: translate(-12px, -6px) rotate(-2deg); }
+      80% { transform: translate(12px, 6px) rotate(2deg); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+    .punch-shake {
+      animation: punchShake 0.35s cubic-bezier(.36,.07,.19,.97) both;
+    }
+
     .hidden { display: none !important; }
     button { cursor: pointer; border: none; background: var(--accent); color: white; padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 600; transition: 0.2s; }
     button:hover { background: var(--accent-hover); }
@@ -30,11 +54,23 @@
     button.danger { background: var(--danger); }
     input, select, textarea { background: #0f172a; border: 1px solid #334155; color: white; padding: 0.6rem; border-radius: 6px; width: 100%; margin-top: 0.3rem; margin-bottom: 1rem; }
     
-    /* Login Screen */
-    .auth-container { max-width: 420px; margin: auto; padding: 2.5rem; background: var(--card-bg); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; }
+    /* Login Screen & Logo Area */
+    .auth-container { max-width: 420px; margin: auto; padding: 2.5rem; background: var(--card-bg); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; position: relative; z-index: 10; transition: transform 0.1s ease-out; }
+    
+    .login-logo-wrapper {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    
+    .login-logo-img {
+      max-width: 160px;
+      max-height: 120px;
+      object-fit: contain;
+      display: inline-block;
+    }
 
     /* App Layout */
-    #app-container { display: flex; width: 100vw; min-height: 100vh; }
+    #app-container { display: flex; width: 100vw; min-height: 100vh; z-index: 10; }
 
     /* Collapsible Sidebar */
     sidebar {
@@ -111,7 +147,6 @@
     .sync-indicator { font-size: 0.8rem; color: var(--success); margin-left: auto; display: inline-flex; align-items: center; gap: 0.3rem; }
     .locked-text { color: var(--text-muted); font-style: italic; }
     
-    /* Toolbar Layout */
     .prestige-toolbar {
       display: flex;
       gap: 0.75rem;
@@ -127,8 +162,14 @@
 </head>
 <body>
 
+  <!-- FX CANVAS FOR PARTICLES & BUNNY CHASER -->
+  <canvas id="fx-canvas"></canvas>
+
   <!-- VIEW 1: LOGIN -->
   <div id="view-login" class="auth-container">
+    <div id="login-logo-container" class="login-logo-wrapper hidden">
+      <img id="login-logo" class="login-logo-img" alt="Guild Logo">
+    </div>
     <h2 style="margin-bottom: 1.5rem; text-align: center;">Arcadia Guild Portal</h2>
     <form id="login-form">
       <label>Username</label>
@@ -275,6 +316,19 @@
 
       <!-- PAGE 4: MANAGEMENT PAGE -->
       <main id="view-management" class="hidden">
+        <!-- LOGO MANAGEMENT CARD -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <h2>Guild Logo Branding</h2>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Upload a custom PNG logo to display above the login portal.
+          </p>
+          <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+            <input type="file" id="logo-file-input" accept="image/png" style="margin: 0; max-width: 300px;">
+            <button id="upload-logo-btn">Upload PNG Logo</button>
+            <button id="remove-logo-btn" class="danger">Remove Logo</button>
+          </div>
+        </div>
+
         <div id="user-management-section" class="card">
           <h2>User Database & Management</h2>
           <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
@@ -345,11 +399,16 @@
     let db = {
       users: JSON.parse(localStorage.getItem('arcadia_users')) || DEFAULT_USERS,
       welcomeMsg: localStorage.getItem('arcadia_welcome') || "Greetings, adventurer! Welcome to the hall of Arcadia.",
+      logo: localStorage.getItem('arcadia_logo') || null,
       currentUser: null
     };
 
     let prestigeSearchQuery = '';
     let prestigeSortBy = 'name';
+
+    // State tracking for inactivity & bunny mechanic
+    let isUserLoggedIn = false;
+    let loginStartTime = Date.now();
 
     // Standardize user objects
     db.users.forEach(u => {
@@ -365,6 +424,11 @@
     function saveDB() {
       localStorage.setItem('arcadia_users', JSON.stringify(db.users));
       localStorage.setItem('arcadia_welcome', db.welcomeMsg);
+      if (db.logo) {
+        localStorage.setItem('arcadia_logo', db.logo);
+      } else {
+        localStorage.removeItem('arcadia_logo');
+      }
       
       const status = document.getElementById('auto-sync-status');
       if (status) {
@@ -372,9 +436,22 @@
       }
     }
 
-    // Auto-save strictly every 5 minutes (300,000 ms)
     setInterval(saveDB, 5 * 60 * 1000);
     window.addEventListener('beforeunload', saveDB);
+
+    // DISPLAY LOGO IN LOGIN PORTAL
+    function renderLogoDisplay() {
+      const container = document.getElementById('login-logo-container');
+      const img = document.getElementById('login-logo');
+      if (db.logo) {
+        img.src = db.logo;
+        container.classList.remove('hidden');
+      } else {
+        img.src = '';
+        container.classList.add('hidden');
+      }
+    }
+    renderLogoDisplay();
 
     // SIDEBAR TOGGLE
     const sidebar = document.getElementById('sidebar');
@@ -385,7 +462,7 @@
       toggleBtn.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀';
     });
 
-    // AUTHENTICATION
+    // AUTHENTICATION & SESSION PERSISTENCE
     document.getElementById('login-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const userVal = document.getElementById('login-username').value.trim();
@@ -394,6 +471,7 @@
       const user = db.users.find(u => u.username.toLowerCase() === userVal.toLowerCase() && u.password === passVal);
       if (user) {
         db.currentUser = user;
+        localStorage.setItem('arcadia_session_user', user.username);
         document.getElementById('login-form').reset();
         showApp();
       } else {
@@ -404,8 +482,33 @@
     document.getElementById('sidebar-logout-btn').addEventListener('click', () => {
       saveDB();
       db.currentUser = null;
+      isUserLoggedIn = false;
+      loginStartTime = Date.now();
+      localStorage.removeItem('arcadia_session_user');
       document.getElementById('app-container').classList.add('hidden');
       document.getElementById('view-login').classList.remove('hidden');
+
+      if (window.resetFXCanvas) {
+        window.resetFXCanvas();
+      }
+    });
+
+    // RESTORE SESSION ON PAGE REFRESH
+    window.addEventListener('DOMContentLoaded', () => {
+      const activeUsername = localStorage.getItem('arcadia_session_user');
+      if (activeUsername) {
+        const existingUser = db.users.find(u => u.username.toLowerCase() === activeUsername.toLowerCase());
+        if (existingUser) {
+          db.currentUser = existingUser;
+          showApp();
+        } else {
+          isUserLoggedIn = false;
+          loginStartTime = Date.now();
+        }
+      } else {
+        isUserLoggedIn = false;
+        loginStartTime = Date.now();
+      }
     });
 
     // NAVIGATION
@@ -456,12 +559,17 @@
     navSettingsBtn.addEventListener('click', () => switchView('settings'));
 
     function showApp() {
+      isUserLoggedIn = true;
       document.getElementById('view-login').classList.add('hidden');
       document.getElementById('app-container').classList.remove('hidden');
       
       const role = db.currentUser.role;
       const roleLower = role.toLowerCase();
       const isGuest = roleLower === 'guest';
+
+      if (window.clearFXCanvas) {
+        window.clearFXCanvas();
+      }
       
       document.getElementById('user-display').innerText = db.currentUser.username;
       
@@ -488,6 +596,48 @@
 
       switchView('home');
     }
+
+    // LOGO UPLOAD & REMOVAL LOGIC
+    document.getElementById('upload-logo-btn').addEventListener('click', () => {
+      const roleLower = db.currentUser.role.toLowerCase();
+      if (roleLower !== 'admin' && roleLower !== 'superadmin') {
+        alert("Permission denied!");
+        return;
+      }
+
+      const input = document.getElementById('logo-file-input');
+      const file = input.files[0];
+
+      if (!file) {
+        alert("Please select a file first.");
+        return;
+      }
+
+      if (file.type !== 'image/png') {
+        alert("Invalid file format! The logo must be a PNG image (.png).");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        db.logo = evt.target.result;
+        saveDB();
+        renderLogoDisplay();
+        input.value = '';
+        alert("PNG Logo updated successfully!");
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('remove-logo-btn').addEventListener('click', () => {
+      const roleLower = db.currentUser.role.toLowerCase();
+      if (roleLower !== 'admin' && roleLower !== 'superadmin') return;
+
+      db.logo = null;
+      saveDB();
+      renderLogoDisplay();
+      alert("Logo removed.");
+    });
 
     function renderWelcome() {
       document.getElementById('welcome-message').innerText = db.welcomeMsg;
@@ -809,7 +959,6 @@
       renderSheets();
     });
 
-    // ENTER KEY NAVIGATION LOGIC FOR CUMULATIVE PRESTIGE
     window.handleCumulativeKeydown = function(event, username, index) {
       if (event.key === 'Enter') {
         event.preventDefault();
@@ -855,20 +1004,17 @@
         importBtn.classList.add('hidden');
       }
 
-      // Filter: Show everyone with a Guild Role (excluding Superadmin & Guest)
       let eligibleMembers = db.users.filter(u => {
         const uRole = u.role.toLowerCase();
         return uRole !== 'superadmin' && uRole !== 'guest';
       });
 
-      // Search Filter
       if (prestigeSearchQuery) {
         eligibleMembers = eligibleMembers.filter(u => 
           u.username.toLowerCase().includes(prestigeSearchQuery.toLowerCase())
         );
       }
 
-      // Sort Filter
       eligibleMembers.sort((a, b) => {
         if (prestigeSortBy === 'cumulative') {
           return (Number(b.cumulativePrestige) || 0) - (Number(a.cumulativePrestige) || 0);
@@ -887,13 +1033,9 @@
         const claimed = Number(user.claimedPrestige) || 0;
         const remaining = Math.max(0, eligible - claimed);
 
-        // Column 1: Read-Only Name
         const tdName = `<td><strong>${user.username}</strong></td>`;
-        
-        // Column 2: Read-Only Guild Role
         const tdRole = `<td><span class="guild-badge">${user.guildRole || 'Members'}</span></td>`;
         
-        // Column 3: Cumulative Prestige (Editable with Enter key focus jumping)
         let tdCumulative = `<td>${cumulative.toLocaleString()}</td>`;
         if (isPowerUser) {
           tdCumulative = `
@@ -905,10 +1047,8 @@
           `;
         }
 
-        // Column 4: 25% Eligible Prestige
         const tdEligible = `<td style="color: var(--accent); font-weight: bold;">${eligible.toLocaleString(undefined, {maximumFractionDigits: 2})}</td>`;
 
-        // Column 5: Claimed Prestige
         let tdClaimed = `<td>${claimed.toLocaleString()}</td>`;
         if (canEditClaimed) {
           tdClaimed = `
@@ -921,7 +1061,6 @@
           tdClaimed = `<td>${claimed.toLocaleString()} <span class="locked-text">(Locked)</span></td>`;
         }
 
-        // Column 6: Remaining Prestige
         const tdRemaining = `<td style="color: var(--success); font-weight: bold;">${remaining.toLocaleString(undefined, {maximumFractionDigits: 2})}</td>`;
 
         tr.innerHTML = tdName + tdRole + tdCumulative + tdEligible + tdClaimed + tdRemaining;
@@ -929,14 +1068,12 @@
       });
     }
 
-    // UPDATE CUMULATIVE PRESTIGE
     window.updateCumulativePrestige = function(username, val, focusNextIndex = null) {
       const numVal = Math.max(0, parseFloat(val) || 0);
       const user = db.users.find(u => u.username === username);
       if (user) {
         user.cumulativePrestige = numVal;
         
-        // Validate if claimed exceeds new eligible limit
         const eligible = numVal * 0.25;
         if (user.claimedPrestige > eligible) {
           user.claimedPrestige = eligible;
@@ -945,7 +1082,6 @@
         saveDB();
         renderSheets();
 
-        // Focus & highlight the next cumulative input field if requested
         if (focusNextIndex !== null) {
           const inputs = document.querySelectorAll('.cumulative-input');
           if (inputs[focusNextIndex]) {
@@ -956,7 +1092,6 @@
       }
     };
 
-    // UPDATE CLAIMED PRESTIGE
     window.updateClaimedPrestige = function(username, val, maxEligible) {
       const loggedUser = db.currentUser;
       const roleLower = loggedUser.role.toLowerCase();
@@ -1031,6 +1166,297 @@
       reader.readAsText(file);
       e.target.value = '';
     });
+
+    // INTERACTIVE CANVAS (LOGIN-ONLY BUNNY CHASER & PARTICLES)
+    (function initCanvasFX() {
+      const canvas = document.getElementById('fx-canvas');
+      const ctx = canvas.getContext('2d');
+
+      let width = canvas.width = window.innerWidth;
+      let height = canvas.height = window.innerHeight;
+
+      window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+      });
+
+      const rawMouse = { x: width / 2, y: height / 2 };
+      const cursorOffset = { x: 0, y: 0 };
+      let particles = [];
+      let punchImpacts = [];
+      let bunnies = [];
+
+      function createInitialBunny() {
+        return {
+          x: width / 2 - 120,
+          y: height / 2 - 120,
+          vx: 0,
+          vy: 0,
+          speed: 0.045,
+          state: 'chasing',
+          lastPunchTime: 0
+        };
+      }
+
+      bunnies = [createInitialBunny()];
+
+      // Global helper to wipe particles/bunnies upon successful login
+      window.clearFXCanvas = function() {
+        particles = [];
+        punchImpacts = [];
+        bunnies = [];
+        ctx.clearRect(0, 0, width, height);
+      };
+
+      // Global helper to restore bunnies on logout
+      window.resetFXCanvas = function() {
+        particles = [];
+        punchImpacts = [];
+        bunnies = [createInitialBunny()];
+      };
+
+      window.addEventListener('mousemove', (e) => {
+        if (isUserLoggedIn) return;
+        rawMouse.x = e.clientX;
+        rawMouse.y = e.clientY;
+      });
+
+      // CLICK-TO-KICK BUNNY (Active only on Login Screen)
+      window.addEventListener('mousedown', (e) => {
+        if (isUserLoggedIn) return;
+
+        const clickX = e.clientX;
+        const clickY = e.clientY;
+
+        for (let i = bunnies.length - 1; i >= 0; i--) {
+          const b = bunnies[i];
+          if (b.state !== 'chasing') continue;
+
+          const dist = Math.hypot(clickX - b.x, clickY - b.y);
+          if (dist < 46) {
+            b.state = 'kicked';
+            
+            const angle = Math.atan2(b.y - clickY, b.x - clickX);
+            const force = 22 + Math.random() * 8;
+            b.vx = Math.cos(angle) * force;
+            b.vy = Math.sin(angle) * force - 14;
+            b.rotation = 0;
+            b.vRot = (Math.random() - 0.5) * 0.6;
+
+            punchImpacts.push({ x: b.x, y: b.y, text: '💥 POW!', life: 25, color: '#f59e0b' });
+            for (let p = 0; p < 20; p++) {
+              particles.push({
+                x: b.x,
+                y: b.y,
+                vx: (Math.random() - 0.5) * 16,
+                vy: (Math.random() - 0.5) * 16,
+                size: Math.random() * 6 + 3,
+                color: '#f59e0b',
+                alpha: 1
+              });
+            }
+            break;
+          }
+        }
+      });
+
+      // SPAWN BUNNY PERIODICALLY (Only on Login Screen)
+      function spawnBunny() {
+        if (isUserLoggedIn || bunnies.length >= 10) return;
+
+        let x, y;
+        const edge = Math.floor(Math.random() * 4);
+        if (edge === 0) { x = Math.random() * width; y = -50; }
+        else if (edge === 1) { x = width + 50; y = Math.random() * height; }
+        else if (edge === 2) { x = Math.random() * width; y = height + 50; }
+        else { x = -50; y = Math.random() * height; }
+
+        bunnies.push({
+          x: x,
+          y: y,
+          vx: 0,
+          vy: 0,
+          speed: 0.035 + Math.random() * 0.025,
+          state: 'chasing',
+          lastPunchTime: 0
+        });
+      }
+
+      setInterval(spawnBunny, 10000);
+
+      function triggerPunchEffect(bunnyX, bunnyY, targetX, targetY) {
+        const authContainer = document.querySelector('.auth-container');
+        
+        const angle = Math.atan2(targetY - bunnyY, targetX - bunnyX);
+        const pushForce = 150;
+        cursorOffset.x += Math.cos(angle) * pushForce;
+        cursorOffset.y += Math.sin(angle) * pushForce;
+
+        if (authContainer) {
+          authContainer.classList.add('punch-shake');
+          setTimeout(() => authContainer.classList.remove('punch-shake'), 350);
+        }
+
+        punchImpacts.push({ x: targetX, y: targetY, text: '🥊 PUNCH!', life: 22, color: '#ef4444' });
+
+        for (let i = 0; i < 22; i++) {
+          particles.push({
+            x: targetX,
+            y: targetY,
+            vx: Math.cos(angle) * (8 + Math.random() * 12) + (Math.random() - 0.5) * 6,
+            vy: Math.sin(angle) * (8 + Math.random() * 12) + (Math.random() - 0.5) * 6,
+            size: Math.random() * 6 + 3,
+            color: '#ef4444',
+            alpha: 1
+          });
+        }
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, width, height);
+
+        // Completely stop processing and rendering if logged in
+        if (isUserLoggedIn) {
+          requestAnimationFrame(animate);
+          return;
+        }
+
+        // Decay knockback displacement
+        cursorOffset.x *= 0.84;
+        cursorOffset.y *= 0.84;
+
+        const effectiveMouseX = rawMouse.x + cursorOffset.x;
+        const effectiveMouseY = rawMouse.y + cursorOffset.y;
+
+        // Emit trail particles at cursor position
+        if (Math.random() > 0.3) {
+          particles.push({
+            x: effectiveMouseX,
+            y: effectiveMouseY,
+            vx: (Math.random() - 0.5) * 2.5,
+            vy: (Math.random() - 0.5) * 2.5,
+            size: Math.random() * 4 + 2,
+            color: `hsl(${Math.random() * 50 + 230}, 90%, 75%)`,
+            alpha: 1
+          });
+        }
+
+        // Draw knocked-back target reticle
+        const offsetDist = Math.hypot(cursorOffset.x, cursorOffset.y);
+        if (offsetDist > 8) {
+          ctx.save();
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(effectiveMouseX, effectiveMouseY, 14, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        const secondsElapsed = (Date.now() - loginStartTime) / 1000;
+        const canPunch = secondsElapsed >= 5;
+
+        // Render particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.alpha -= 0.025;
+
+          if (p.alpha <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.globalAlpha = p.alpha;
+          ctx.fillStyle = p.color;
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Render punch impacts
+        for (let i = punchImpacts.length - 1; i >= 0; i--) {
+          const imp = punchImpacts[i];
+          ctx.save();
+          ctx.font = '900 24px "Segoe UI", sans-serif';
+          ctx.fillStyle = imp.color;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = imp.color;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(imp.text, imp.x, imp.y - (25 - imp.life));
+          ctx.restore();
+          
+          imp.life--;
+          if (imp.life <= 0) punchImpacts.splice(i, 1);
+        }
+
+        // Render & Update Bunnies
+        for (let i = bunnies.length - 1; i >= 0; i--) {
+          const b = bunnies[i];
+
+          if (b.state === 'chasing') {
+            b.x += (effectiveMouseX - b.x) * b.speed;
+            b.y += (effectiveMouseY - b.y) * b.speed;
+
+            const dist = Math.hypot(effectiveMouseX - b.x, effectiveMouseY - b.y);
+
+            if (dist < 32 && canPunch && (Date.now() - b.lastPunchTime > 800)) {
+              b.lastPunchTime = Date.now();
+
+              const angle = Math.atan2(b.y - effectiveMouseY, b.x - effectiveMouseX);
+              b.x += Math.cos(angle) * 40;
+              b.y += Math.sin(angle) * 40;
+
+              triggerPunchEffect(b.x, b.y, effectiveMouseX, effectiveMouseY);
+            }
+
+            ctx.save();
+            ctx.font = '36px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const hopOffset = Math.abs(Math.sin(Date.now() / 140)) * 6;
+
+            if (effectiveMouseX < b.x) {
+              ctx.translate(b.x, b.y - hopOffset);
+              ctx.scale(-1, 1);
+              ctx.fillText('🐇', 0, 0);
+            } else {
+              ctx.fillText('🐇', b.x, b.y - hopOffset);
+            }
+            ctx.restore();
+
+          } else if (b.state === 'kicked') {
+            b.x += b.vx;
+            b.y += b.vy;
+            b.vy += 0.75;
+            b.rotation = (b.rotation || 0) + (b.vRot || 0.2);
+
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            ctx.rotate(b.rotation);
+            ctx.font = '36px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🐇', 0, 0);
+            ctx.restore();
+
+            if (b.y > height + 100 || b.x < -100 || b.x > width + 100) {
+              bunnies.splice(i, 1);
+            }
+          }
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      animate();
+    })();
   </script>
 </body>
 </html>
