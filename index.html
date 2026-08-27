@@ -418,7 +418,6 @@
   <script>
     // ==========================================
     // 1. FIREBASE CONFIGURATION
-    // Replace with your Firebase Project Config
     // ==========================================
     const firebaseConfig = {
       apiKey: "AIzaSyAUYjwcenaxn5aLxCeISOfwYJTRJx_Oop4",
@@ -585,7 +584,7 @@
       bunny.element.classList.add('launched');
       bunny.element.innerText = '💥';
       
-      // Funny upward + sideways arc fling
+      // Upward + sideways arc fling
       bunny.vx = (Math.random() - 0.5) * 35;
       bunny.vy = -(28 + Math.random() * 15);
       bunny.gravity = 1.3;
@@ -629,7 +628,7 @@
         let bunny = bunnies[i];
 
         if (bunny.isLaunched) {
-          // Funny Parabolic Arc Motion
+          // Parabolic Arc Motion
           bunny.x += bunny.vx;
           bunny.y += bunny.vy;
           bunny.vy += bunny.gravity;
