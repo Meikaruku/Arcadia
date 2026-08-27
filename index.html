@@ -29,13 +29,24 @@
     .screen { display: none; height: 100vh; width: 100vw; }
     .screen.active { display: flex; }
 
-    /* LOGIN PAGE & BUNNY MINIGAME */
+    /* LOGIN PAGE & MINIGAME */
     #login-screen {
       position: relative;
       justify-content: center;
       align-items: center;
       background: radial-gradient(circle at center, #1e1b4b 0%, #0f172a 100%);
       overflow: hidden;
+    }
+
+    /* Particle Trail Canvas */
+    #cursor-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 8;
     }
 
     .login-card {
@@ -50,7 +61,6 @@
       width: 100%;
       max-width: 400px;
       text-align: center;
-      transition: transform 0.05s ease;
     }
 
     .login-card h2 { margin-bottom: 1.5rem; color: #a5b4fc; letter-spacing: 1px; }
@@ -121,18 +131,34 @@
       color: #facc15;
     }
 
-    /* Vicious Bunny Sprite */
+    /* Intense Angry Bunny FX */
+    @keyframes angryVibrate {
+      0% { transform: scale(1.1) translate(0, 0) rotate(0deg); }
+      20% { transform: scale(1.25) translate(-3px, 3px) rotate(-10deg); }
+      40% { transform: scale(1.15) translate(3px, -3px) rotate(10deg); }
+      60% { transform: scale(1.3) translate(-2px, -2px) rotate(-6deg); }
+      80% { transform: scale(1.2) translate(2px, 2px) rotate(6deg); }
+      100% { transform: scale(1.1) translate(0, 0) rotate(0deg); }
+    }
+
     .bunny {
       position: absolute;
       width: 42px;
       height: 42px;
-      font-size: 32px;
+      font-size: 34px;
       user-select: none;
       cursor: pointer;
       z-index: 5;
-      transition: transform 0.1s linear;
       line-height: 42px;
       text-align: center;
+      animation: angryVibrate 0.1s infinite linear;
+      filter: drop-shadow(0 0 14px #ff0055) drop-shadow(0 0 6px #ff0000);
+      transition: filter 0.2s;
+    }
+
+    .bunny.launched {
+      animation: none;
+      filter: drop-shadow(0 0 16px #facc15);
     }
 
     /* MAIN APP LAYOUT */
@@ -270,6 +296,7 @@
 
   <!-- LOGIN SCREEN -->
   <div id="login-screen" class="screen active">
+    <canvas id="cursor-canvas"></canvas>
     <div class="score-board">Bunnies Defeated: <span id="bunny-score">0</span></div>
     
     <div class="login-card" id="login-card">
@@ -366,15 +393,14 @@
     // Replace with your Firebase Project Config
     // ==========================================
     const firebaseConfig = {
-      apiKey: "AIzaSyAUYjwcenaxn5aLxCeISOfwYJTRJx_Oop4",
-      authDomain: "arcadia-8bb67.firebaseapp.com",
-      projectId: "arcadia-8bb67",
-      storageBucket: "arcadia-8bb67.firebasestorage.app",
-      messagingSenderId: "800998244719",
-      appId: "1:800998244719:web:e72bfe3d2b57c4a70aa89a"
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
     };
 
-    // Initialize Primary & Secondary App (Secondary allows user creation without logging out Admin)
     const app = firebase.initializeApp(firebaseConfig);
     const secondaryApp = firebase.initializeApp(firebaseConfig, "SecondaryApp");
     
@@ -387,19 +413,72 @@
     let bunnies = [];
     let bunnyInterval = null;
     let animFrame = null;
-    let mousePos = { x: 0, y: 0 };
+    let mousePos = { x: -100, y: -100 };
 
     // ==========================================
-    // 2. BUNNY MINIGAME LOGIC
+    // 2. CURSOR PARTICLE SYSTEM
     // ==========================================
-    const loginScreen = document.getElementById('login-screen');
-    const loginCard = document.getElementById('login-card');
-    const scoreDisplay = document.getElementById('bunny-score');
+    const canvas = document.getElementById('cursor-canvas');
+    const ctx = canvas.getContext('2d');
+    let cursorParticles = [];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
 
     window.addEventListener('mousemove', (e) => {
       mousePos.x = e.clientX;
       mousePos.y = e.clientY;
+
+      // Spawn glowing trail particles on cursor move
+      for (let i = 0; i < 3; i++) {
+        cursorParticles.push({
+          x: e.clientX,
+          y: e.clientY,
+          vx: (Math.random() - 0.5) * 3,
+          vy: (Math.random() - 0.5) * 3,
+          size: Math.random() * 5 + 2,
+          hue: Math.floor(Math.random() * 60 + 210), // Electric blue to purple hue range
+          alpha: 1,
+          decay: Math.random() * 0.03 + 0.025
+        });
+      }
     });
+
+    function updateAndRenderParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let i = cursorParticles.length - 1; i >= 0; i--) {
+        let p = cursorParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.size *= 0.95;
+        p.alpha -= p.decay;
+
+        if (p.alpha <= 0 || p.size <= 0.5) {
+          cursorParticles.splice(i, 1);
+          continue;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = `hsl(${p.hue}, 100%, 65%)`;
+        ctx.shadowColor = `hsl(${p.hue}, 100%, 50%)`;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // ==========================================
+    // 3. INTENSE BUNNY MINIGAME LOGIC
+    // ==========================================
+    const loginScreen = document.getElementById('login-screen');
+    const scoreDisplay = document.getElementById('bunny-score');
 
     function initMinigame() {
       score = 0;
@@ -411,9 +490,8 @@
       clearInterval(bunnyInterval);
       cancelAnimationFrame(animFrame);
 
-      // Spawn bunny every 10s up to 10 max
       bunnyInterval = setInterval(spawnBunny, 10000);
-      spawnBunny(); // Spawn first immediately
+      spawnBunny();
       gameLoop();
     }
 
@@ -424,7 +502,6 @@
       bunnyEl.className = 'bunny';
       bunnyEl.innerText = '🐇';
       
-      // Calculate position away from existing bunnies & center
       let x, y, safe = false;
       let attempts = 0;
       while (!safe && attempts < 50) {
@@ -458,11 +535,11 @@
     function launchBunny(bunny) {
       if (bunny.isLaunched) return;
       bunny.isLaunched = true;
+      bunny.element.classList.add('launched');
       bunny.element.innerText = '💥';
       
-      // Launch vector away from center screen
       const angle = Math.atan2(bunny.y - window.innerHeight / 2, bunny.x - window.innerWidth / 2);
-      const force = 30 + Math.random() * 20;
+      const force = 35 + Math.random() * 20;
       bunny.vx = Math.cos(angle) * force;
       bunny.vy = Math.sin(angle) * force;
 
@@ -472,40 +549,30 @@
     }
 
     function gameLoop() {
+      updateAndRenderParticles();
+
       bunnies.forEach((bunny, index) => {
         if (bunny.isLaunched) {
-          // Launched animation logic
           bunny.x += bunny.vx;
           bunny.y += bunny.vy;
-          bunny.element.style.transform = `scale(1.5) rotate(${bunny.x * 2}deg)`;
+          bunny.element.style.transform = `scale(1.5) rotate(${bunny.x * 4}deg)`;
           bunny.element.style.left = `${bunny.x}px`;
           bunny.element.style.top = `${bunny.y}px`;
 
-          // Remove if offscreen
           if (bunny.x < -100 || bunny.x > window.innerWidth + 100 || 
               bunny.y < -100 || bunny.y > window.innerHeight + 100) {
             bunny.element.remove();
             bunnies.splice(index, 1);
           }
         } else {
-          // Vicious Pursuit Logic
+          // Aggressive Pursuit Logic without Knockback
           const dx = mousePos.x - (bunny.x + 20);
           const dy = mousePos.y - (bunny.y + 20);
           const dist = Math.hypot(dx, dy);
 
           if (dist > 5) {
-            bunny.x += (dx / dist) * 1.8;
-            bunny.y += (dy / dist) * 1.8;
-          }
-
-          // Knockback Attack on Cursor
-          if (dist < 25) {
-            loginCard.style.transform = `translate(${(Math.random() - 0.5) * 15}px, ${(Math.random() - 0.5) * 15}px)`;
-            setTimeout(() => loginCard.style.transform = 'translate(0,0)', 50);
-            
-            // Push bunny back slightly after attack
-            bunny.x -= (dx / dist) * 20;
-            bunny.y -= (dy / dist) * 20;
+            bunny.x += (dx / dist) * 3.2; // Fast aggressive pursuit speed
+            bunny.y += (dy / dist) * 3.2;
           }
 
           bunny.element.style.left = `${bunny.x}px`;
@@ -521,13 +588,15 @@
       cancelAnimationFrame(animFrame);
       bunnies.forEach(b => b.element.remove());
       bunnies = [];
+      cursorParticles = [];
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       score = 0;
       sessionStorage.removeItem('bunnyScore');
       scoreDisplay.innerText = 0;
     }
 
     // ==========================================
-    // 3. AUTHENTICATION LOGIC
+    // 4. AUTHENTICATION LOGIC
     // ==========================================
     document.getElementById('login-form').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -566,7 +635,6 @@
       if (doc.exists) {
         currentUserData = doc.data();
       } else {
-        // Fallback default setup for initial superadmin login
         const isSuper = user.email === 'superadmin@arcadia.com';
         currentUserData = {
           uid: user.uid,
@@ -580,7 +648,7 @@
     }
 
     // ==========================================
-    // 4. NAVIGATION & PERMISSIONS
+    // 5. NAVIGATION & PERMISSIONS
     // ==========================================
     function setupNavigation() {
       const settingsBtn = document.getElementById('nav-settings');
@@ -610,7 +678,7 @@
     }
 
     // ==========================================
-    // 5. GUILD & USER MANAGEMENT (SETTINGS)
+    // 6. GUILD & USER MANAGEMENT (SETTINGS)
     // ==========================================
     function loadGuildData() {
       db.collection('settings').doc('guild').onSnapshot(doc => {
@@ -639,7 +707,6 @@
       alert('Guild settings updated successfully!');
     }
 
-    // Add New User (Secondary Auth instance retains current Admin state)
     document.getElementById('create-user-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!['superadmin', 'admin'].includes(currentUserData.systemRole)) return;
