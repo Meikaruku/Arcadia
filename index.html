@@ -3,276 +3,399 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Firebase Username & Role Manager</title>
+  <title>Login & Bunny FX</title>
   <style>
-    body { font-family: sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem; }
-    .card { border: 1px solid #ccc; padding: 1.5rem; margin-bottom: 1.5rem; border-radius: 8px; }
-    .hidden { display: none; }
-    label { display: block; margin-top: 0.5rem; font-weight: bold; }
-    input, select, button { margin-top: 0.25rem; padding: 0.5rem; width: 100%; box-sizing: border-box; }
-    button { margin-top: 1rem; background-color: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px;}
-    button:hover { background-color: #0056b3; }
-    .user-row { display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #eee; padding: 0.5rem 0; }
-    .user-row select, .user-row input { width: auto; flex: 1; }
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text); min-height: 100vh; display: flex; overflow-x: hidden; position: relative; }
+    
+    /* Interactive Canvas Overlay */
+    #fx-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Screen Punch Knockback Animation */
+    @keyframes punchShake {
+      0% { transform: translate(0, 0) rotate(0deg); }
+      20% { transform: translate(-18px, 12px) rotate(-4deg); }
+      40% { transform: translate(18px, -12px) rotate(4deg); }
+      60% { transform: translate(-12px, -6px) rotate(-2deg); }
+      80% { transform: translate(12px, 6px) rotate(2deg); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+    .punch-shake {
+      animation: punchShake 0.35s cubic-bezier(.36,.07,.19,.97) both;
+    }
+
+    .hidden { display: none !important; }
+    button { cursor: pointer; border: none; background: var(--accent); color: white; padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 600; transition: 0.2s; }
+    button:hover { background: var(--accent-hover); }
+    input { background: #0f172a; border: 1px solid #334155; color: white; padding: 0.6rem; border-radius: 6px; width: 100%; margin-top: 0.3rem; margin-bottom: 1rem; }
+    
+    /* Login Screen & Logo Area */
+    .auth-container { max-width: 420px; margin: auto; padding: 2.5rem; background: var(--card-bg); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; position: relative; z-index: 10; transition: transform 0.1s ease-out; }
+    .login-logo-wrapper { text-align: center; margin-bottom: 1rem; }
+    .login-logo-img { max-width: 160px; max-height: 120px; object-fit: contain; display: inline-block; }
+    .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 0.5rem; text-align: center; }
   </style>
 </head>
 <body>
 
-  <h1>App Portal</h1>
+  <!-- FX CANVAS FOR PARTICLES & BUNNY CHASER -->
+  <canvas id="fx-canvas"></canvas>
 
-  <!-- Auth Section -->
-  <div id="auth-section" class="card">
-    <h2>Login / Sign Up</h2>
-    <label>Username</label>
-    <input type="text" id="username-input" placeholder="e.g. hero99" />
-    
-    <label>Password</label>
-    <input type="password" id="password-input" placeholder="••••••••" />
-
-    <button id="btn-login">Log In</button>
-    <button id="btn-signup" style="background-color: #28a745;">Register New Account</button>
-    <button id="btn-forgot" style="background-color: #6c757d;">Forgot Password?</button>
+  <!-- LOGIN VIEW -->
+  <div id="view-login" class="auth-container">
+    <div id="login-logo-container" class="login-logo-wrapper hidden">
+      <img id="login-logo" class="login-logo-img" alt="Guild Logo">
+    </div>
+    <h2 style="margin-bottom: 1.5rem; text-align: center;">Arcadia Guild Portal</h2>
+    <form id="login-form">
+      <label>Email Address</label>
+      <input type="email" id="login-email" required placeholder="user@domain.com" autocomplete="email">
+      <label>Password</label>
+      <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password">
+      <button type="submit" id="login-btn" style="width:100%; margin-top: 0.5rem;">Sign In</button>
+      <div id="login-error" class="error-msg"></div>
+    </form>
   </div>
 
-  <!-- Dashboard Section -->
-  <div id="dashboard-section" class="card hidden">
-    <h2>Welcome, <span id="display-username"></span>!</h2>
-    <p><strong>System Role:</strong> <span id="display-system-role"></span></p>
-    <p><strong>Guild Role:</strong> <span id="display-guild-role"></span></p>
-
-    <hr>
-
-    <h3>Account Security</h3>
-    <label>New Password</label>
-    <input type="password" id="new-password-input" placeholder="New Password" />
-    <button id="btn-update-password">Update Password</button>
-
-    <button id="btn-logout" style="background-color: #dc3545;">Log Out</button>
-  </div>
-
-  <!-- Admin Panel Section -->
-  <div id="admin-section" class="card hidden">
-    <h2>User Role Management</h2>
-    <div id="user-list">Loading users...</div>
-  </div>
-
-  <!-- Firebase Modular SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { 
-      getAuth, 
-      createUserWithEmailAndPassword, 
-      signInWithEmailAndPassword, 
-      signOut, 
-      updatePassword, 
-      sendPasswordResetEmail,
-      onAuthStateChanged 
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { 
-      getFirestore, 
-      doc, 
-      setDoc, 
-      getDoc, 
-      collection, 
-      getDocs, 
-      updateDoc 
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-    // 1. Firebase Configuration
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
+      apiKey: "AIzaSyAUYjwcenaxn5aLxCeISOfwYJTRJx_Oop4",
+      authDomain: "arcadia-8bb67.firebaseapp.com",
+      projectId: "arcadia-8bb67",
+      storageBucket: "arcadia-8bb67.firebasestorage.app",
+      messagingSenderId: "800998244719",
+      appId: "1:800998244719:web:e72bfe3d2b57c4a70aa89a"
     };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
 
-    // Helper: Map pure username to internal email domain
-    const formatToEmail = (username) => {
-      const clean = username.trim().toLowerCase();
-      return clean.includes('@') ? clean : `${clean}@app.internal`;
-    };
+    let isUserLoggedIn = false;
+    let loginStartTime = Date.now();
 
-    let currentUserData = null;
-
-    // 2. Auth State Observer
-    onAuthStateChanged(auth, async (user) => {
+    // Firebase Auth State Listener
+    onAuthStateChanged(auth, (user) => {
       if (user) {
-        // Fetch User Document from Firestore
-        const userDocRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userDocRef);
+        isUserLoggedIn = true;
+        document.getElementById('view-login').classList.add('hidden');
+        if (window.clearFXCanvas) window.clearFXCanvas();
+      } else {
+        isUserLoggedIn = false;
+        loginStartTime = Date.now();
+        document.getElementById('view-login').classList.remove('hidden');
+        if (window.resetFXCanvas) window.resetFXCanvas();
+      }
+    });
 
-        if (userSnap.exists()) {
-          currentUserData = { uid: user.uid, ...userSnap.data() };
-          
-          // Display User Info
-          document.getElementById('display-username').textContent = currentUserData.username;
-          document.getElementById('display-system-role').textContent = currentUserData.systemRole;
-          document.getElementById('display-guild-role').textContent = currentUserData.guildRole;
+    // Login Submission Handler
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const loginBtn = document.getElementById('login-btn');
+      const errBox = document.getElementById('login-error');
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
 
-          // Toggle Panels
-          document.getElementById('auth-section').classList.add('hidden');
-          document.getElementById('dashboard-section').classList.remove('hidden');
+      errBox.innerText = '';
+      loginBtn.disabled = true;
+      loginBtn.innerText = 'Signing In...';
 
-          // Render Admin Panel if User Has Privileges
-          const isAdminRole = ['Super Admin', 'System Admin', 'Admin'].includes(currentUserData.systemRole);
-          if (isAdminRole) {
-            document.getElementById('admin-section').classList.remove('hidden');
-            loadAllUsers();
-          } else {
-            document.getElementById('admin-section').classList.add('hidden');
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (error) {
+        errBox.innerText = error.message.replace("Firebase: ", "");
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.innerText = 'Sign In';
+      }
+    });
+
+    // INTERACTIVE CANVAS (BUNNY CHASER & PARTICLES)
+    (function initCanvasFX() {
+      const canvas = document.getElementById('fx-canvas');
+      const ctx = canvas.getContext('2d');
+
+      let width = canvas.width = window.innerWidth;
+      let height = canvas.height = window.innerHeight;
+
+      window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+      });
+
+      const rawMouse = { x: width / 2, y: height / 2 };
+      const cursorOffset = { x: 0, y: 0 };
+      let particles = [];
+      let punchImpacts = [];
+      let bunnies = [];
+
+      function createInitialBunny() {
+        return {
+          x: width / 2 - 120,
+          y: height / 2 - 120,
+          vx: 0,
+          vy: 0,
+          speed: 0.045,
+          state: 'chasing',
+          lastPunchTime: 0
+        };
+      }
+
+      bunnies = [createInitialBunny()];
+
+      window.clearFXCanvas = function() {
+        particles = [];
+        punchImpacts = [];
+        bunnies = [];
+        ctx.clearRect(0, 0, width, height);
+      };
+
+      window.resetFXCanvas = function() {
+        particles = [];
+        punchImpacts = [];
+        bunnies = [createInitialBunny()];
+      };
+
+      window.addEventListener('mousemove', (e) => {
+        if (isUserLoggedIn) return;
+        rawMouse.x = e.clientX;
+        rawMouse.y = e.clientY;
+      });
+
+      // Click to Kick Bunny Mechanic
+      window.addEventListener('mousedown', (e) => {
+        if (isUserLoggedIn) return;
+        const clickX = e.clientX;
+        const clickY = e.clientY;
+
+        for (let i = bunnies.length - 1; i >= 0; i--) {
+          const b = bunnies[i];
+          if (b.state !== 'chasing') continue;
+
+          const dist = Math.hypot(clickX - b.x, clickY - b.y);
+          if (dist < 46) {
+            b.state = 'kicked';
+            const angle = Math.atan2(b.y - clickY, b.x - clickX);
+            const force = 22 + Math.random() * 8;
+            b.vx = Math.cos(angle) * force;
+            b.vy = Math.sin(angle) * force - 14;
+            b.rotation = 0;
+            b.vRot = (Math.random() - 0.5) * 0.6;
+
+            punchImpacts.push({ x: b.x, y: b.y, text: '💥 POW!', life: 25, color: '#f59e0b' });
+            for (let p = 0; p < 20; p++) {
+              particles.push({
+                x: b.x, y: b.y,
+                vx: (Math.random() - 0.5) * 16,
+                vy: (Math.random() - 0.5) * 16,
+                size: Math.random() * 6 + 3,
+                color: '#f59e0b',
+                alpha: 1
+              });
+            }
+            break;
           }
         }
-      } else {
-        currentUserData = null;
-        document.getElementById('auth-section').classList.remove('hidden');
-        document.getElementById('dashboard-section').classList.add('hidden');
-        document.getElementById('admin-section').classList.add('hidden');
-      }
-    });
+      });
 
-    // 3. User Registration
-    document.getElementById('btn-signup').addEventListener('click', async () => {
-      const rawUser = document.getElementById('username-input').value;
-      const pass = document.getElementById('password-input').value;
-      const email = formatToEmail(rawUser);
+      // Spawn bunnies over time
+      function spawnBunny() {
+        if (isUserLoggedIn || bunnies.length >= 10) return;
+        let x, y;
+        const edge = Math.floor(Math.random() * 4);
+        if (edge === 0) { x = Math.random() * width; y = -50; }
+        else if (edge === 1) { x = width + 50; y = Math.random() * height; }
+        else if (edge === 2) { x = Math.random() * width; y = height + 50; }
+        else { x = -50; y = Math.random() * height; }
 
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, email, pass);
-        // Default roles assigned upon creation
-        await setDoc(doc(db, "users", cred.user.uid), {
-          username: rawUser.trim(),
-          email: email,
-          systemRole: "User",
-          guildRole: "Member"
+        bunnies.push({
+          x: x, y: y, vx: 0, vy: 0,
+          speed: 0.035 + Math.random() * 0.025,
+          state: 'chasing',
+          lastPunchTime: 0
         });
-        alert("Account registered successfully!");
-      } catch (err) {
-        alert(err.message);
       }
-    });
 
-    // 4. User Login
-    document.getElementById('btn-login').addEventListener('click', async () => {
-      const rawUser = document.getElementById('username-input').value;
-      const pass = document.getElementById('password-input').value;
-      const email = formatToEmail(rawUser);
+      setInterval(spawnBunny, 10000);
 
-      try {
-        await signInWithEmailAndPassword(auth, email, pass);
-      } catch (err) {
-        alert("Login failed: " + err.message);
-      }
-    });
+      function triggerPunchEffect(bunnyX, bunnyY, targetX, targetY) {
+        const authContainer = document.querySelector('.auth-container');
+        const angle = Math.atan2(targetY - bunnyY, targetX - bunnyX);
+        const pushForce = 150;
+        cursorOffset.x += Math.cos(angle) * pushForce;
+        cursorOffset.y += Math.sin(angle) * pushForce;
 
-    // 5. Password Reset (Forgot Password)
-    document.getElementById('btn-forgot').addEventListener('click', async () => {
-      const rawUser = document.getElementById('username-input').value;
-      if (!rawUser) return alert("Please type your username in the box first.");
-      
-      const email = formatToEmail(rawUser);
-      try {
-        await sendPasswordResetEmail(auth, email);
-        alert(`Password reset request processed for ${rawUser}.`);
-      } catch (err) {
-        alert("Error sending reset email: " + err.message);
-      }
-    });
+        if (authContainer) {
+          authContainer.classList.add('punch-shake');
+          setTimeout(() => authContainer.classList.remove('punch-shake'), 350);
+        }
 
-    // 6. Update Password (Logged-In User)
-    document.getElementById('btn-update-password').addEventListener('click', async () => {
-      const newPass = document.getElementById('new-password-input').value;
-      if (!newPass) return alert("Enter a new password.");
-
-      try {
-        await updatePassword(auth.currentUser, newPass);
-        alert("Password updated successfully!");
-        document.getElementById('new-password-input').value = "";
-      } catch (err) {
-        if (err.code === 'auth/requires-recent-login') {
-          alert("Security timeout: Please log out and log back in to change your password.");
-        } else {
-          alert(err.message);
+        punchImpacts.push({ x: targetX, y: targetY, text: '🥊 PUNCH!', life: 22, color: '#ef4444' });
+        for (let i = 0; i < 22; i++) {
+          particles.push({
+            x: targetX, y: targetY,
+            vx: Math.cos(angle) * (8 + Math.random() * 12) + (Math.random() - 0.5) * 6,
+            vy: Math.sin(angle) * (8 + Math.random() * 12) + (Math.random() - 0.5) * 6,
+            size: Math.random() * 6 + 3,
+            color: '#ef4444',
+            alpha: 1
+          });
         }
       }
-    });
 
-    // 7. Logout
-    document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+      function animate() {
+        ctx.clearRect(0, 0, width, height);
 
-    // 8. Admin Panel: Fetch & Render User List
-    async function loadAllUsers() {
-      const container = document.getElementById('user-list');
-      container.innerHTML = "Loading...";
+        if (isUserLoggedIn) {
+          requestAnimationFrame(animate);
+          return;
+        }
 
-      const querySnapshot = await getDocs(collection(db, "users"));
-      container.innerHTML = "";
+        cursorOffset.x *= 0.84;
+        cursorOffset.y *= 0.84;
 
-      querySnapshot.forEach((userDoc) => {
-        const targetUser = { id: userDoc.id, ...userDoc.data() };
-        
-        const row = document.createElement('div');
-        row.className = 'user-row';
-        row.innerHTML = `
-          <strong style="width: 120px;">${targetUser.username}</strong>
+        const effectiveMouseX = rawMouse.x + cursorOffset.x;
+        const effectiveMouseY = rawMouse.y + cursorOffset.y;
+
+        // Trail particles
+        if (Math.random() > 0.3) {
+          particles.push({
+            x: effectiveMouseX, y: effectiveMouseY,
+            vx: (Math.random() - 0.5) * 2.5,
+            vy: (Math.random() - 0.5) * 2.5,
+            size: Math.random() * 4 + 2,
+            color: `hsl(${Math.random() * 50 + 230}, 90%, 75%)`,
+            alpha: 1
+          });
+        }
+
+        // Reticle on displacement
+        const offsetDist = Math.hypot(cursorOffset.x, cursorOffset.y);
+        if (offsetDist > 8) {
+          ctx.save();
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(effectiveMouseX, effectiveMouseY, 14, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        const canPunch = (Date.now() - loginStartTime) / 1000 >= 5;
+
+        // Render particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx; p.y += p.vy;
+          p.alpha -= 0.025;
+          if (p.alpha <= 0) { particles.splice(i, 1); continue; }
+
+          ctx.save();
+          ctx.globalAlpha = p.alpha;
+          ctx.fillStyle = p.color;
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Render punch text
+        for (let i = punchImpacts.length - 1; i >= 0; i--) {
+          const imp = punchImpacts[i];
+          ctx.save();
+          ctx.font = '900 24px "Segoe UI", sans-serif';
+          ctx.fillStyle = imp.color;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = imp.color;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(imp.text, imp.x, imp.y - (25 - imp.life));
+          ctx.restore();
           
-          <select id="sys-role-${targetUser.id}">
-            <option value="User" ${targetUser.systemRole === 'User' ? 'selected' : ''}>User</option>
-            <option value="Admin" ${targetUser.systemRole === 'Admin' ? 'selected' : ''}>Admin</option>
-            <option value="System Admin" ${targetUser.systemRole === 'System Admin' ? 'selected' : ''}>System Admin</option>
-            <option value="Super Admin" ${targetUser.systemRole === 'Super Admin' ? 'selected' : ''}>Super Admin</option>
-          </select>
+          imp.life--;
+          if (imp.life <= 0) punchImpacts.splice(i, 1);
+        }
 
-          <input type="text" id="guild-role-${targetUser.id}" value="${targetUser.guildRole || ''}" placeholder="Guild Role" />
-          
-          <button style="width: auto; margin:0;" id="btn-save-${targetUser.id}">Save</button>
-        `;
+        // Render & Update Bunnies
+        for (let i = bunnies.length - 1; i >= 0; i--) {
+          const b = bunnies[i];
 
-        container.appendChild(row);
+          if (b.state === 'chasing') {
+            b.x += (effectiveMouseX - b.x) * b.speed;
+            b.y += (effectiveMouseY - b.y) * b.speed;
+            const dist = Math.hypot(effectiveMouseX - b.x, effectiveMouseY - b.y);
 
-        // Bind update event with permission logic
-        document.getElementById(`btn-save-${targetUser.id}`).addEventListener('click', () => {
-          updateUserRole(targetUser);
-        });
-      });
-    }
+            if (dist < 32 && canPunch && (Date.now() - b.lastPunchTime > 800)) {
+              b.lastPunchTime = Date.now();
+              const angle = Math.atan2(b.y - effectiveMouseY, b.x - effectiveMouseX);
+              b.x += Math.cos(angle) * 40;
+              b.y += Math.sin(angle) * 40;
+              triggerPunchEffect(b.x, b.y, effectiveMouseX, effectiveMouseY);
+            }
 
-    // 9. Role Update Logic (Enforces Super Admin Protection)
-    async function updateUserRole(targetUser) {
-      const callerRole = currentUserData.systemRole;
-      const targetCurrentRole = targetUser.systemRole;
+            ctx.save();
+            ctx.font = '36px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const hopOffset = Math.abs(Math.sin(Date.now() / 140)) * 6;
 
-      // Rule Check: System Admins & Admins cannot modify a Super Admin
-      if (targetCurrentRole === 'Super Admin' && callerRole !== 'Super Admin') {
-        alert("Permission Denied: Only a Super Admin can modify another Super Admin's roles.");
-        return;
+            if (effectiveMouseX < b.x) {
+              ctx.translate(b.x, b.y - hopOffset);
+              ctx.scale(-1, 1);
+              ctx.fillText('🐇', 0, 0);
+            } else {
+              ctx.fillText('🐇', b.x, b.y - hopOffset);
+            }
+            ctx.restore();
+
+          } else if (b.state === 'kicked') {
+            b.x += b.vx; b.y += b.vy;
+            b.vy += 0.75;
+            b.rotation = (b.rotation || 0) + (b.vRot || 0.2);
+
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            ctx.rotate(b.rotation);
+            ctx.font = '36px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🐇', 0, 0);
+            ctx.restore();
+
+            if (b.y > height + 100 || b.x < -100 || b.x > width + 100) {
+              bunnies.splice(i, 1);
+            }
+          }
+        }
+
+        requestAnimationFrame(animate);
       }
 
-      const newSystemRole = document.getElementById(`sys-role-${targetUser.id}`).value;
-      const newGuildRole = document.getElementById(`guild-role-${targetUser.id}`).value;
-
-      // Rule Check: Non-Super Admins cannot promote anyone TO Super Admin
-      if (newSystemRole === 'Super Admin' && callerRole !== 'Super Admin') {
-        alert("Permission Denied: Only a Super Admin can grant the Super Admin role.");
-        return;
-      }
-
-      try {
-        await updateDoc(doc(db, "users", targetUser.id), {
-          systemRole: newSystemRole,
-          guildRole: newGuildRole
-        });
-        alert(`Roles updated for ${targetUser.username}!`);
-        loadAllUsers(); // Refresh UI
-      } catch (err) {
-        alert("Failed to update roles: " + err.message);
-      }
-    }
+      animate();
+    })();
   </script>
 </body>
 </html>
