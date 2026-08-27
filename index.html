@@ -421,13 +421,13 @@
     // Replace with your Firebase Project Config
     // ==========================================
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+  	apiKey: "AIzaSyAUYjwcenaxn5aLxCeISOfwYJTRJx_Oop4",
+  	authDomain: "arcadia-8bb67.firebaseapp.com",
+ 	 projectId: "arcadia-8bb67",
+  	storageBucket: "arcadia-8bb67.firebasestorage.app",
+ 	 messagingSenderId: "800998244719",
+ 	 appId: "1:800998244719:web:e72bfe3d2b57c4a70aa89a"
+	};
 
     const app = firebase.initializeApp(firebaseConfig);
     const secondaryApp = firebase.initializeApp(firebaseConfig, "SecondaryApp");
@@ -502,7 +502,7 @@
     }
 
     // ==========================================
-    // 3. MINIGAME LOGIC (NO-STACK, BOUNCE & FUNNY ARC)
+    // 3. MINIGAME LOGIC WITH ACCELERATION/DECELERATION
     // ==========================================
     const loginScreen = document.getElementById('login-screen');
     const scoreDisplay = document.getElementById('bunny-score');
@@ -545,13 +545,14 @@
         element: bunnyEl,
         x: x,
         y: y,
+        speed: 1.0,           // Dynamic pursuit speed state
         vx: 0,
         vy: 0,
         gravity: 0,
         rotation: 0,
         rotSpeed: 0,
         isLaunched: false,
-        lastPunch: 0 // Track 5s punch cooldown timestamp
+        lastPunch: 0          // 5s attack cooldown timer
       };
 
       bunnyEl.addEventListener('click', (e) => {
@@ -584,11 +585,11 @@
       bunny.element.classList.add('launched');
       bunny.element.innerText = '💥';
       
-      // Arc Fling Trajectory (Upwards + Sideways launch with gravity)
-      bunny.vx = (Math.random() - 0.5) * 35; // Random horizontal velocity
-      bunny.vy = -(28 + Math.random() * 15);  // High upward velocity
-      bunny.gravity = 1.3;                    // Pull down in arc trajectory
-      bunny.rotSpeed = (Math.random() - 0.5) * 50; // Frantic spinning speed
+      // Funny upward + sideways arc fling
+      bunny.vx = (Math.random() - 0.5) * 35;
+      bunny.vy = -(28 + Math.random() * 15);
+      bunny.gravity = 1.3;
+      bunny.rotSpeed = (Math.random() - 0.5) * 50;
 
       score++;
       sessionStorage.setItem('bunnyScore', score);
@@ -599,7 +600,7 @@
       updateAndRenderParticles();
       const now = Date.now();
 
-      // --- A. Dynamic Separation Logic (Prevent Bunnies from Stacking) ---
+      // --- A. Separation Logic (Prevents Bunnies Stacking) ---
       for (let i = 0; i < bunnies.length; i++) {
         if (bunnies[i].isLaunched) continue;
         for (let j = i + 1; j < bunnies.length; j++) {
@@ -623,7 +624,7 @@
         }
       }
 
-      // --- B. Movement, Attack Cooldown & Launch Loop ---
+      // --- B. Movement, Pursuit Physics & Launch Arc ---
       for (let i = bunnies.length - 1; i >= 0; i--) {
         let bunny = bunnies[i];
 
@@ -631,41 +632,55 @@
           // Funny Parabolic Arc Motion
           bunny.x += bunny.vx;
           bunny.y += bunny.vy;
-          bunny.vy += bunny.gravity; // Gravity pulling bunny down into arc
+          bunny.vy += bunny.gravity;
           bunny.rotation += bunny.rotSpeed;
 
           bunny.element.style.transform = `scale(1.6) rotate(${bunny.rotation}deg)`;
           bunny.element.style.left = `${bunny.x}px`;
           bunny.element.style.top = `${bunny.y}px`;
 
-          // Despawn clean removal when out of bounds
+          // Despawn clean removal off-screen
           if (bunny.y > window.innerHeight + 150 || bunny.x < -150 || bunny.x > window.innerWidth + 150) {
             bunny.element.remove();
             bunnies.splice(i, 1);
           }
         } else {
-          // Aggressive Pursuit toward Cursor
+          // Cursor Pursuit Physics
           const dx = mousePos.x - (bunny.x + 23);
           const dy = mousePos.y - (bunny.y + 23);
           const dist = Math.hypot(dx, dy);
 
-          const chaseSpeed = 7.5;
+          const maxSpeed = 13.0;      // Peak chase speed
+          const minSpeed = 1.5;       // Slow strike prep speed
+          const slowRadius = 180.0;   // Distance at which deceleration kicks in
 
           if (dist > 5) {
-            bunny.x += (dx / dist) * chaseSpeed;
-            bunny.y += (dy / dist) * chaseSpeed;
+            if (dist > slowRadius) {
+              // ACCELERATE when far away or when cursor moves away
+              bunny.speed = Math.min(maxSpeed, bunny.speed + 0.35);
+            } else {
+              // DECELERATE smoothly as bunny nears cursor
+              let targetSpeed = minSpeed + (maxSpeed - minSpeed) * (dist / slowRadius);
+              bunny.speed += (targetSpeed - bunny.speed) * 0.12;
+            }
+
+            bunny.x += (dx / dist) * bunny.speed;
+            bunny.y += (dy / dist) * bunny.speed;
           }
 
           // Punch Attack (Triggered once every 5 seconds per bunny)
           if (dist < 32) {
-            if (now - bunny.lastPunch >= 5000) { // 5-second cooldown check
+            if (now - bunny.lastPunch >= 5000) {
               bunny.lastPunch = now;
               triggerPunchEffect(mousePos.x, mousePos.y);
 
-              // Bounce back away from cursor on attack hit
-              const bounceForce = 75;
+              // Knockback bounce away from cursor
+              const bounceForce = 85;
               bunny.x -= (dx / dist) * bounceForce;
               bunny.y -= (dy / dist) * bounceForce;
+
+              // Reset current speed so bunny re-accelerates back toward cursor
+              bunny.speed = 1.0;
             }
           }
 
@@ -696,7 +711,7 @@
       e.preventDefault();
       const userVal = document.getElementById('login-username').value.trim();
       
-      // Auto-append @arcadia.com if user types username only
+      // Auto-append @arcadia.com if typing username only
       const email = userVal.includes('@') ? userVal : `${userVal}@arcadia.com`;
       const pass = document.getElementById('login-password').value;
 
